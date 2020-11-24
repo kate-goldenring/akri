@@ -3,7 +3,7 @@ entries:
   akri:
   - apiVersion: v2
     appVersion: 0.0.36
-    created: "2020-11-19T20:22:04.061613705Z"
+    created: "2020-11-24T19:01:54.700765753Z"
     description: A Helm chart for Akri
     digest: 1b6ba9af22f8e0a86f24105364fcb79248d3ad3787054a3c156c719b58c2edd2
     name: akri
@@ -13,7 +13,7 @@ entries:
     version: 0.0.36
   - apiVersion: v2
     appVersion: 0.0.35
-    created: "2020-11-19T20:22:04.060097406Z"
+    created: "2020-11-24T19:01:54.700052557Z"
     description: A Helm chart for Akri
     digest: a2f07d58121e44bc9137c69a68e4e00b36888230022386af08135f092d50957f
     name: akri
@@ -23,7 +23,7 @@ entries:
     version: 0.0.35
   - apiVersion: v2
     appVersion: 0.0.34
-    created: "2020-11-19T20:22:04.059058807Z"
+    created: "2020-11-24T19:01:54.699319661Z"
     description: A Helm chart for Akri
     digest: 7de3828affe7184c6bc9376092499cfd0afbf7d12c2bada21d9d85aeddbbea4f
     name: akri
@@ -33,8 +33,18 @@ entries:
     version: 0.0.34
   akri-dev:
   - apiVersion: v2
+    appVersion: 0.0.42
+    created: "2020-11-24T19:01:54.704116733Z"
+    description: A Helm chart for Akri development
+    digest: 30ff6f79eef3c0cc5ccf36c71d221b6312ade8056b1d98beadc3d23f0f3f3594
+    name: akri-dev
+    type: application
+    urls:
+    - https://deislabs.github.io/akri/akri-dev-0.0.42.tgz
+    version: 0.0.42
+  - apiVersion: v2
     appVersion: 0.0.41
-    created: "2020-11-19T20:22:04.063740303Z"
+    created: "2020-11-24T19:01:54.703141039Z"
     description: A Helm chart for Akri development
     digest: 514a7f5f83628cf0f5d27bfeaa0218ad2f0698cfcce1d7ef83bb777470d36584
     name: akri-dev
@@ -44,7 +54,7 @@ entries:
     version: 0.0.41
   - apiVersion: v2
     appVersion: 0.0.38
-    created: "2020-11-19T20:22:04.062686904Z"
+    created: "2020-11-24T19:01:54.702071745Z"
     description: A Helm chart for Akri development
     digest: 5d838eb7427ff09de715cc6524df7a7cc1ab7f21e84a1b123743434e2db17e34
     name: akri-dev
@@ -52,4 +62,4 @@ entries:
     urls:
     - https://deislabs.github.io/akri/akri-dev-0.0.38.tgz
     version: 0.0.38
-generated: "2020-11-19T20:22:04.056633008Z"
+generated: "2020-11-24T19:01:54.698214368Z"
