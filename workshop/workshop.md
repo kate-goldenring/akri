@@ -8,7 +8,7 @@ We've provided some Ubuntu 20.04 VMs
 
 Go to link:
 
-Set up a username and password
+Set up a username and password. Choose a password that you do not mind sharing in the case you run into troubles and may want us to ssh into your machine.
 
 ## Setting up your MicroK8s and mock cameras cluster
 Install MicroK8s, a light weight Kubernetes distribution, and a kernel module for mocking udev video devices. The script also creates two mock cameras at device nodes `/dev/video1` and `/dev/video2` and creates a fake stream from the cameras.
@@ -80,6 +80,45 @@ To make the subsequent commands simpler lets:
     udev-camera-svc          ClusterIP   10.XXX.XXX.XXX   <none>        80/TCP         42m
     ```
 1. Navigate in your browser to http://ip-address:31143/ where ip-address is the IP address of your ubuntu VM and the port number is from the output of `kubectl get services`. You should see three videos. The top video streams frames from all udev cameras (from the overarching `udev-camera-svc` service), while each of the bottom videos displays the streams from each of the individual camera services (`udev-camera-901a7b-svc` and `udev-camera-e2548e-svc`). Note: the streaming web application displays at a rate of 1 fps.
+
+## Access the End-to-End Demo
+
+To determine the NodePort of the service, you can either ssh in to the droplet and then run the command to determine the NodePort.
+
+Or, from your host (!) machine, you may combine the steps:
+
+```bash
+COMMAND="\
+  sudo microk8s.kubectl get service/akri-video-streaming-app \
+  --output=jsonpath='{.spec.ports[?(@.name==\"http\")].nodePort}'"
+NODEPORT=$(\
+  ssh -i ${SSHKEY} root@${IP} "${COMMAND}") && \
+echo ${NODEPORT}
+```
+
+The `kubectl` command gets the `akri-video-stream-app` service as JSON and filters the output to determine the NodePort (`${NODEPORT}`) that's been assigned.
+
+The `ssh` command runs the `kubectl` commands against the droplet.
+
+Then we can use ssh port-forwarding to forward one of our host's (!) local ports (`${HOSTPORT}`) to the Kubernetes' service's NodePort (`{NODEPORT}`):
+
+```bash
+HOSTPORT=8888
+
+ssh -i ${SSHKEY} root@${IP} -L ${HOSTPORT}:localhost:${NODEPORT}
+```
+
+> **NOTE** `HOSTPORT` can be the same as `NODEPORT` if this is available on your host.
+
+The port-forwarding only works while the ssh sessions is running. So, while the previous command is running in one shell, browse the demo's HTTP endpoint:
+
+```console
+http://localhost:${HOSTPORT}/
+```
+
+> **NOTE** You'll need to manually replace `${HOSTPORT}` with the value (e.g. `8888`)
+
+> **NOTE** The terminating `/` is important
 
 ## TODO: test whether can host onvif camera in one of the lab vms
 
