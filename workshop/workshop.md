@@ -68,50 +68,17 @@ To make the subsequent commands simpler lets:
     ```
 1. Determine which port the service is running on.
     ```sh
-    kubectl get services
-    ```
-    Something like the following will be displayed. The ids of the camera services (`udev-camera-<id>-svc`) will likely be different as they are determined by hostname.
-    ```
-    NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
-    kubernetes               ClusterIP   10.XXX.XXX.X     <none>        443/TCP        2d5h
-    streaming                NodePort    10.XXX.XXX.XX    <none>        80:31143/TCP   41m
-    udev-camera-901a7b-svc   ClusterIP   10.XXX.XXX.XX    <none>        80/TCP         42m
-    udev-camera-e2548e-svc   ClusterIP   10.XXX.XXX.XX    <none>        80/TCP         42m
-    udev-camera-svc          ClusterIP   10.XXX.XXX.XXX   <none>        80/TCP         42m
-    ```
+   kubectl get service/akri-video-streaming-app --output=jsonpath='{.spec.ports[?(@.name=="http")].nodePort}'
+   ```
 1. Navigate in your browser to http://ip-address:31143/ where ip-address is the IP address of your ubuntu VM and the port number is from the output of `kubectl get services`. You should see three videos. The top video streams frames from all udev cameras (from the overarching `udev-camera-svc` service), while each of the bottom videos displays the streams from each of the individual camera services (`udev-camera-901a7b-svc` and `udev-camera-e2548e-svc`). Note: the streaming web application displays at a rate of 1 fps.
 
 ## Access the End-to-End Demo
 
-To determine the NodePort of the service, you can either ssh in to the droplet and then run the command to determine the NodePort.
-
-Or, from your host (!) machine, you may combine the steps:
-
-```bash
-COMMAND="\
-  sudo microk8s.kubectl get service/akri-video-streaming-app \
-  --output=jsonpath='{.spec.ports[?(@.name==\"http\")].nodePort}'"
-NODEPORT=$(\
-  ssh -i ${SSHKEY} root@${IP} "${COMMAND}") && \
-echo ${NODEPORT}
+Lets use SSH port forwarding to access our streaming application. Open a new terminal and run:
+```sh
+ssh -p 57708 vmuser@ml-lab-04dfadac-b7ff-4e78-bcbe-5c5690b00d7b.westus2.cloudapp.azure.com -L 8888:localhost:30106
 ```
-
-The `kubectl` command gets the `akri-video-stream-app` service as JSON and filters the output to determine the NodePort (`${NODEPORT}`) that's been assigned.
-
-The `ssh` command runs the `kubectl` commands against the droplet.
-
-Then we can use ssh port-forwarding to forward one of our host's (!) local ports (`${HOSTPORT}`) to the Kubernetes' service's NodePort (`{NODEPORT}`):
-
-```bash
-HOSTPORT=8888
-
-ssh -i ${SSHKEY} root@${IP} -L ${HOSTPORT}:localhost:${NODEPORT}
-```
-
-> **NOTE** `HOSTPORT` can be the same as `NODEPORT` if this is available on your host.
-
-The port-forwarding only works while the ssh sessions is running. So, while the previous command is running in one shell, browse the demo's HTTP endpoint:
-
+Navigate to `http://localhost:8888/`
 ```console
 http://localhost:${HOSTPORT}/
 ```
