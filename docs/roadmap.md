@@ -17,10 +17,10 @@ extensibility document](./extensibility.md) for more details.
 1. OPC UA (to discover OPC UA Servers) 
 
 ### Protocols we are thinking about adding support for
+- Zeroconf ([proposal](./proposals/zeroconf.md))
 - Bluetooth
 - Simple scan for IP/MAC addresses
 - LoRaWAN
-- Zeroconf
 - Looking for community feedback for more!
 
 ## Akri enhancements
