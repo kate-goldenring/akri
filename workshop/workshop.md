@@ -59,17 +59,17 @@ You tell Akri what you want to find with an Akri Configuration, which is one of 
 For this workshop, we will specify (1) Akri's udev discovery protocol, which is used to discover devices in the Linux device file system. Akri's udev discovery protocol supports (2) filtering by udev rules. We want to find all video devices in the Linux device file system, which can be specified by the udev rule `KERNEL=="video[0-9]*"`. Say we wanted to be more specific and only discover devices made by Great Vendor, we could adjust our rule to be `KERNEL=="video[0-9]*"\, ENV{ID_VENDOR}=="Great Vendor"`. For a broker Pod image, we will use a sample container that Akri has provided that pulls frames from the cameras and serves them over gRPC. 
 
 Instead of having to build a Configuration from scratch, Akri has provided [Helm templates](../deployment/helm/templates) for each supported discovery protocol. Lets customize the generic [udev Helm template](../deployment/helm/templates/udev.yaml) with our three specifications above. We can also set the name for the Configuration to be `akri-udev-video`. Also, K3s uses its own embedded crictl, so we need to configure the k3s crictl path and socket. Now we can add the Akri Helm chart and run our install command with our chosen Helm values.
-    ```sh
-    helm repo add akri-helm-charts https://deislabs.github.io/akri/
-    helm install akri akri-helm-charts/akri \
-        --set useLatestContainers=true \
-        --set udev.enabled=true \
-        --set udev.name=akri-udev-video \
-        --set udev.udevRules[0]='KERNEL=="video[0-9]*"' \
-        --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest-dev" \
-        --set agent.host.crictl=/usr/local/bin/crictl \
-        --set agent.host.dockerShimSock=/run/k3s/containerd/containerd.sock
-    ```
+```sh
+helm repo add akri-helm-charts https://deislabs.github.io/akri/
+helm install akri akri-helm-charts/akri \
+    --set useLatestContainers=true \
+    --set udev.enabled=true \
+    --set udev.name=akri-udev-video \
+    --set udev.udevRules[0]='KERNEL=="video[0-9]*"' \
+    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest-dev" \
+    --set agent.host.crictl=/usr/local/bin/crictl \
+    --set agent.host.dockerShimSock=/run/k3s/containerd/containerd.sock
+```
 
 ## Investigating Akri
 Now, that we have installed Akri, lets see what happened. Since the /dev/video1 and /dev/video2 devices are running on this node, the Akri Agent will discover them and create an Instance for each camera. 
