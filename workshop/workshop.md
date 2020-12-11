@@ -1,5 +1,5 @@
-# Akri Brownbag
-In this brownbag, we will walk through using Akri to discover mock USB cameras attached to nodes in a Kubernetes cluster. You'll see how Akri automatically deploys workloads to pull frames from the cameras. We will then deploy a streaming application that will point to services automatically created by Akri to access the video frames from the workloads. To illustrate how Akri dynamically discovers devices, we will add an additional camera and watch as its frames begin to be displayed on the application as well. 
+# Akri Workshop
+In this workshop, we will walk through using Akri to discover mock USB cameras attached to nodes in a Kubernetes cluster. You'll see how Akri automatically deploys workloads to pull frames from the cameras. We will then deploy a streaming application that will point to services automatically created by Akri to access the video frames from the workloads. To illustrate how Akri dynamically discovers devices, we will add an additional camera and watch as its frames begin to be displayed on the application as well. 
 
 The following will be covered in this workshop:
 1. Gaining access to your Azure Labs VM and setting up any dependencies.  
@@ -39,9 +39,6 @@ Now we can make sure our cameras and cluster are all set up.
     
     Grant admin privilege to access kubeconfig.
     ```sh
-    sudo addgroup k3s-admin
-    sudo adduser $USER k3s-admin
-    sudo usermod -a -G k3s-admin $USER
     sudo chgrp k3s-admin /etc/rancher/k3s/k3s.yaml
     sudo chmod g+r /etc/rancher/k3s/k3s.yaml
     su - $USER
