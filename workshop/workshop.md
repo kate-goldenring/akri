@@ -78,7 +78,7 @@ helm install akri akri-helm-charts/akri \
     --set udev.enabled=true \
     --set udev.name=akri-udev-video \
     --set udev.udevRules[0]='KERNEL=="video[0-9]*"' \
-    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest-dev" \
+    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest" \
     --set agent.host.crictl=/usr/local/bin/crictl \
     --set agent.host.dockerShimSock=/run/k3s/containerd/containerd.sock
 ```
@@ -106,6 +106,10 @@ Now, that we have installed Akri, lets see what happened. Since the /dev/video1 
     kubectl apply -f https://raw.githubusercontent.com/deislabs/akri/main/deployment/samples/akri-video-streaming-app.yaml
     watch kubectl get pods
     ```
+    > **Note** We recently made changes to the streaming application. If it is failing, please apply an older version.
+    > ```sh
+    > kubectl apply -f https://raw.githubusercontent.com/kate-goldenring/akri/akri-workshop/deployment/samples/akri-video-streaming-app.yaml
+    >```
 1. Determine which port the service is running on. Be sure to save this port number for the next step.
     ```sh
    kubectl get service/akri-video-streaming-app --output=jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' && echo

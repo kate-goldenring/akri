@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: akri-video-streaming-app
-        image: ghcr.io/deislabs/akri/video-streaming-app:latest-dev
+        image: ghcr.io/deislabs/akri/video-streaming-app:latest
         imagePullPolicy: Always
         env:
         # Streamer works in two modes; either specify the following commented block of env vars to explicitly target cameras or 
