@@ -6,7 +6,7 @@ The following will be covered in this workshop:
 1. Installing Akri via Helm with settings to create your Akri udev Configuration
 1. Inspecting Akri
 1. Deploying a streaming application
-1. Deploying an additional usb camera
+1. Deploying an additional USB camera
 1. Cleanup
 
 ## Background
@@ -17,28 +17,22 @@ We've provided some Ubuntu 20.10 VMs that have been pre-configured with a [kerne
 
 Go to the link specified in the slides and select a machine. Set up a username and password. Choose a password that you do not mind sharing in the case you run into troubles and may want us to ssh into your machine.
 
-Select "use machine" and copy the ssh script. Run it in your terminal of your choosing. And you're in!
+Select "use machine" and copy the ssh script. Run it in your terminal of your choosing. And you're in! 
 
-Ensure that your mock cameras are running by executing:
-```sh
-./start-camera-streams.sh
-```
-This creates two video device nodes at /dev/video1 and /dev/video2 and uses Gstreamer to pass a fake video stream through them.
-
-Ensure that your cluster is running:
-```sh
-kubectl get nodes
-```
-If the command fails, you VM may have restarted, so K3s needs to be uninstalled and set up again:
-1. Uninstall [K3s](https://k3s.io/)
+Now we can make sure our cameras and cluster are all set up.
+1. Confirm camera setup
+    
+    Check that the mock cameras have already been "plugged into" your VM.
     ```sh
-    /usr/local/bin/k3s-uninstall.sh
+    ls /dev
     ```
-1. Install K3s v1.18.9+k3s1.
+    You should see video1 and video2 device nodes. If these nodes are not listed, run `./add-cameras.sh`. Now that our cameras are set up, lets use Gstreamer to pass a fake video stream through them:
     ```sh
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.18.9+k3s1 sh -
+    ./start-camera-streams.sh
     ```
-1. Grant admin privilege to access kubeconfig.
+1. Ensure your cluster is running
+    
+    Grant admin privilege to access kubeconfig.
     ```sh
     sudo addgroup k3s-admin
     sudo adduser $USER k3s-admin
@@ -47,26 +41,39 @@ If the command fails, you VM may have restarted, so K3s needs to be uninstalled 
     sudo chmod g+r /etc/rancher/k3s/k3s.yaml
     su - $USER
     ```
-1. Check K3s status.
+    Configure the location of your kubeconfig for K3s
     ```sh
-    kubectl get node
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
     ```
+    Check that your node is running
+    ```sh
+    kubectl get nodes
+    ```
+> **Note** If the command fails, your VM may have restarted, so K3s needs to be uninstalled and set up again. Do the following and all the previous steps to "Ensure your cluster is running".
+> 1. Uninstall [K3s](https://k3s.io/)
+>    ```sh
+>    /usr/local/bin/k3s-uninstall.sh
+>    ```
+> 1. Install K3s v1.18.9+k3s1.
+>    ```sh
+>    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.18.9+k3s1 sh -
+>    ```
 ## Installing Akri
 You tell Akri what you want to find with an Akri Configuration, which is one of Akri's Kubernetes custom resources. The Akri Configuration is simply a `yaml` file that you apply to your cluster. Within it, you specify three things: 
 1. a discovery protocol
 2. any additional device filtering
 3. an image for a Pod (that we call a "broker") that you want to be automatically deployed to utilize each discovered device
-For this workshop, we will specify (1) Akri's udev discovery protocol, which is used to discover devices in the Linux device file system. Akri's udev discovery protocol supports (2) filtering by udev rules. We want to find all video devices in the Linux device file system, which can be specified by the udev rule `KERNEL=="video[0-9]*"`. Say we wanted to be more specific and only discover devices made by Great Vendor, we could adjust our rule to be `KERNEL=="video[0-9]*"\, ENV{ID_VENDOR}=="Great Vendor"`. For a broker Pod image, we will use a sample container that Akri has provided that pulls frames from the cameras and serves them over gRPC. 
 
-Instead of having to build a Configuration from scratch, Akri has provided [Helm templates](../deployment/helm/templates) for each supported discovery protocol. Lets customize the generic [udev Helm template](../deployment/helm/templates/udev.yaml) with our three specifications above. We can also set the name for the Configuration to be `akri-udev-video`. Also, K3s uses its own embedded crictl, so we need to configure the k3s crictl path and socket. Now we can add the Akri Helm chart and run our install command with our chosen Helm values.
+For this workshop, we will specify (1) Akri's udev discovery protocol, which is used to discover devices in the Linux device file system. Akri's udev discovery protocol supports (2) filtering by udev rules. We want to find all video devices in the Linux device file system, which can be specified by the udev rule `KERNEL=="video[0-9]*"`. Say we wanted to be more specific and only discover devices made by Great Vendor, we could adjust our rule to be `KERNEL=="video[0-9]*"\, ENV{ID_VENDOR}=="Great Vendor"`. For (3) a broker Pod image, we will use a sample container that Akri has provided that pulls frames from the cameras and serves them over gRPC. 
+
+Instead of having to build a Configuration from scratch, Akri has provided [Helm templates](../deployment/helm/templates) for each supported discovery protocol. Lets customize the generic [udev Helm template](../deployment/helm/templates/udev.yaml) with our three specifications above. We can also set the name for the Configuration to be `akri-udev-video`. Also, K3s uses its own embedded crictl, so we need to configure the K3s crictl path and socket. Now we can add the Akri Helm chart and run our install command with our chosen Helm values.
 ```sh
 helm repo add akri-helm-charts https://deislabs.github.io/akri/
 helm install akri akri-helm-charts/akri \
-    --set useLatestContainers=true \
     --set udev.enabled=true \
     --set udev.name=akri-udev-video \
     --set udev.udevRules[0]='KERNEL=="video[0-9]*"' \
-    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest-dev" \
+    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest" \
     --set agent.host.crictl=/usr/local/bin/crictl \
     --set agent.host.dockerShimSock=/run/k3s/containerd/containerd.sock
 ```
@@ -76,7 +83,7 @@ Now, that we have installed Akri, lets see what happened. Since the /dev/video1 
 
 1. Lets see all that Akri has automatically created and deployed, namely the Akri Configuration we created when installing Akri, two Instances (which are the Akri custom resource that represents each device), two broker Pods (one for each camera), a service for each broker Pod, and a service for all brokers.
     ```sh
-    kubectl get pods,akric,akrii,services
+    watch kubectl get pods,akric,akrii,svcs
     ```
     Lets look at the Configuration and Instances in more detail. 
 
@@ -94,18 +101,18 @@ Now, that we have installed Akri, lets see what happened. Since the /dev/video1 
     kubectl apply -f https://raw.githubusercontent.com/deislabs/akri/main/deployment/samples/akri-video-streaming-app.yaml
     watch kubectl get pods
     ```
-1. Determine which port the service is running on.
+1. Determine which port the service is running on. Be sure to save this port number for the next step.
     ```sh
-   kubectl get service/akri-video-streaming-app --output=jsonpath='{.spec.ports[?(@.name=="http")].nodePort}'
+   kubectl get service/akri-video-streaming-app --output=jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' && echo
    ```
-1. We will use SSH port forwarding to access our streaming application. Open a new terminal enter your ssh command to access your VM followed by the port forwarding request. We will use port 8888 on the host. Feel free to change it. Be sure to specify the port for the streaming application we obtained from the previous step.
-```sh
-<ssh -p 12345 vmuser@something.cloudapp.azure.com> -L 8888:localhost:<APP-PORT>
-```
-1. Navigate to `http://localhost:8888/`. The large feed points to the all-brokers service(`udev-camera-svc`), while the bottom feed points to each individual broker's service (`udev-camera-svc-<id>`).
+1. We will use SSH port forwarding to access our streaming application. Open a new terminal enter your ssh command to access your VM followed by the port forwarding request. We will use port 50000 on the host. Feel free to change it if it is not available. Be sure to replace `APP-PORT` with the port for the streaming application we obtained from the previous step.
+    ```sh
+    <ssh -p 12345 vmuser@something.cloudapp.azure.com> -L 50000:localhost:APP-PORT
+    ```
+1. Navigate to `http://localhost:50000/`. The large feed points to Configuration level service(`udev-camera-svc`), while the bottom feed points to the service for each Instance or camera (`udev-camera-svc-<id>`).
 
 ## Adding another camera
-To show how Akri dynamically discovers new cameras, lets add another camera, by running the following script:
+To show how Akri dynamically discovers new cameras, let's add another camera, by running the following script:
 ```sh
 ./add-third-camera.sh
 ```
@@ -119,8 +126,13 @@ watch kubectl get pods
     kubectl delete service akri-video-streaming-app
     kubectl delete deployment akri-video-streaming-app
     ```
-1. Delete the configuration and watch the instances, pods, and services be deleted.
+1. Delete the configuration and watch the associated instances, pods, and services be deleted.
     ```sh
     kubectl delete akric akri-udev-video
-    watch microk8s kubectl get pods,services,akric,akrii -o wide
+    watch kubectl get pods,services,akric,akrii -o wide
+    ```
+1. If you are done using Akri, it can be uninstalled via Helm.
+    ```sh
+    helm delete akri
+    watch kubectl get pods
     ```
