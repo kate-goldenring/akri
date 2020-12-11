@@ -1,0 +1,39 @@
+# Source: akri/templates/udev.yaml
+apiVersion: akri.sh/v0
+kind: Configuration
+metadata:
+  name: akri-udev-video
+spec:
+  protocol:
+    udev:
+      udevRules:
+      - KERNEL=="video[0-9]*"
+  # Only add broker pod spec if a broker image is provided
+  brokerPodSpec:
+    containers:
+    - name: akri-udev-video-broker
+      image: "ghcr.io/deislabs/akri/udev-video-broker:latest"
+      imagePullPolicy: Always
+      securityContext:
+        privileged: true
+      resources:
+        limits:
+          "{{PLACEHOLDER}}" : "1"
+  # Only add service specs if a broker image was specified and service
+  # creation was not disabled
+  instanceServiceSpec:
+    type: ClusterIP
+    ports:
+    - name: grpc
+      port: 80
+      protocol: TCP
+      targetPort: 8083
+  configurationServiceSpec:
+    type: ClusterIP
+    ports:
+    - name: grpc
+      port: 80
+      protocol: TCP
+      targetPort: 8083
+  properties: {}
+  capacity: 1

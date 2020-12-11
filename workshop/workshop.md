@@ -8,6 +8,7 @@ The following will be covered in this workshop:
 1. Deploying a streaming application
 1. Deploying an additional USB camera
 1. Cleanup
+1. Running the demo again on your own cluster
 
 ## Background
 Akri is an open source project that lets you easily expose IoT devices and peripherals (such as IP cameras and USB devices) as resources in a Kubernetes cluster. Akri continually detects nodes that have access to these devices and schedules workloads based on them. 
@@ -20,13 +21,17 @@ Go to the link specified in the slides and select a machine. Set up a username a
 Select "use machine" and copy the ssh script. Run it in your terminal of your choosing. And you're in! 
 
 Now we can make sure our cameras and cluster are all set up.
-1. Confirm camera setup
+1. Set up two cameras
     
-    Check that the mock cameras have already been "plugged into" your VM.
+    "Plug-in" your cameras by inserting the kernel module.
+    ```sh
+    ./add-cameras.sh
+    ```   
+    You should see video1 and video2 device nodes. 
     ```sh
     ls /dev
     ```
-    You should see video1 and video2 device nodes. If these nodes are not listed, run `./add-cameras.sh`. Now that our cameras are set up, lets use Gstreamer to pass a fake video stream through them:
+    Now that our cameras are set up, lets use Gstreamer to pass a fake video stream through them.
     ```sh
     ./start-camera-streams.sh
     ```
@@ -41,11 +46,11 @@ Now we can make sure our cameras and cluster are all set up.
     sudo chmod g+r /etc/rancher/k3s/k3s.yaml
     su - $USER
     ```
-    Configure the location of your kubeconfig for K3s
+    Configure the location of your kubeconfig for K3s.
     ```sh
     export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
     ```
-    Check that your node is running
+    Check that your node is running.
     ```sh
     kubectl get nodes
     ```
@@ -73,7 +78,7 @@ helm install akri akri-helm-charts/akri \
     --set udev.enabled=true \
     --set udev.name=akri-udev-video \
     --set udev.udevRules[0]='KERNEL=="video[0-9]*"' \
-    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest" \
+    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest-dev" \
     --set agent.host.crictl=/usr/local/bin/crictl \
     --set agent.host.dockerShimSock=/run/k3s/containerd/containerd.sock
 ```
@@ -83,7 +88,7 @@ Now, that we have installed Akri, lets see what happened. Since the /dev/video1 
 
 1. Lets see all that Akri has automatically created and deployed, namely the Akri Configuration we created when installing Akri, two Instances (which are the Akri custom resource that represents each device), two broker Pods (one for each camera), a service for each broker Pod, and a service for all brokers.
     ```sh
-    watch kubectl get pods,akric,akrii,svcs
+    watch kubectl get pods,akric,akrii,services
     ```
     Lets look at the Configuration and Instances in more detail. 
 
@@ -109,6 +114,7 @@ Now, that we have installed Akri, lets see what happened. Since the /dev/video1 
     ```sh
     <ssh -p 12345 vmuser@something.cloudapp.azure.com> -L 50000:localhost:APP-PORT
     ```
+> **Note** we've noticed issues with port forwarding with WSL 2. Please use a different terminal.
 1. Navigate to `http://localhost:50000/`. The large feed points to Configuration level service(`udev-camera-svc`), while the bottom feed points to the service for each Instance or camera (`udev-camera-svc-<id>`).
 
 ## Adding another camera
@@ -136,3 +142,6 @@ watch kubectl get pods
     helm delete akri
     watch kubectl get pods
     ```
+
+## Take Two!
+If you would like to walk through this demo again on your own local cluster, try out the [Akri end to end demo](https://github.com/deislabs/akri/blob/main/docs/end-to-end-demo.md). It includes steps for what we have pre-configured here, namely cluster and video kernel module steps. The demo walks through all the same steps besides dynamically adding a third device, which can only be done using a freshly built v4l2loopback kernel module, as dynamic device management has yet to be packaged into a release. See these [instructions](./setup-kernel-module.md) for more details on how to build the kernel module.
