@@ -16,12 +16,9 @@ class TestRtspMediaFactory(GstRtspServer.RTSPMediaFactory):
         GstRtspServer.RTSPMediaFactory.__init__(self)
 
     def do_create_element(self, url):
-        # Set mp4 file path to filesrc's location property
-        src_demux = "filesrc location=/home/kagold/akri-fork/workshop/akri.mp4 ! qtdemux name=demux"
-        h264_transcode = "demux.video_0"
-        pipeline = "{0} {1} ! queue ! rtph264pay name=pay0 config-interval=1 pt=96".format(src_demux, h264_transcode)
-        mock_pipeline = "videotestsrc pattern=bar horizontal-speed=2 background-color=9228238 foreground-color=4080751 ! x264enc ! queue ! rtph264pay name=pay0 config-interval=1 pt=96" 
-        print ("Element created: " + mock_pipeline)
+        global color
+        mock_pipeline = "videotestsrc pattern=bar horizontal-speed=2 background-color=9228238 foreground-color={0} ! x264enc ! queue ! rtph264pay name=pay0 config-interval=1 pt=96".format(color) 
+        print ("Pipeling launching: " + mock_pipeline)
         return Gst.parse_launch(mock_pipeline)
 
 class GstreamerRtspServer():
@@ -33,6 +30,15 @@ class GstreamerRtspServer():
         mountPoints.add_factory("/stream1", factory)
         self.rtspServer.attach(None)
 
+# Optionally pass in video bar color in decimal format
+# Choose a color: https://www.mathsisfun.com/hexadecimal-decimal-colors.html
 if __name__ == '__main__':
+    global color
+    if len(sys.argv) > 1:
+        color = sys.argv[1]
+        print ("Custom chosen video bar color is " + str(color))
+    else:
+        color = 4080751
+        print ("Default video bar color is " + str(color))
     s = GstreamerRtspServer()
     loop.run()

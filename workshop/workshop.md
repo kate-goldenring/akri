@@ -127,6 +127,20 @@ Watch as another broker Pod spins up for this service and the streaming app upda
 ```sh
 watch kubectl get pods
 ```
+
+## Adding another configuration
+Let's now add the ONVIF configuration to discover a mock IP camera we have running in one of the VMs in the lab. Instead of uninstalling and re-installing Akri via Helm, we can update our Helm installation to include the new ONVIF configuration. Helm will automatically only update the new components, namely the creation of the ONVIF configuration.
+```sh
+helm upgrade akri akri-helm-charts/akri \
+    --set udev.enabled=true \
+    --set udev.name=akri-udev-video \
+    --set udev.udevRules[0]='KERNEL=="video[0-9]*"' \
+    --set udev.brokerPod.image.repository="ghcr.io/deislabs/akri/udev-video-broker:latest" \
+    --set onvif.enabled=true \
+    --set onvif.brokerPod.image.repository="ghcr.io/deislabs/akri/onvif-video-broker:latest-dev" \
+    --set agent.host.crictl=/usr/local/bin/crictl \
+    --set agent.host.dockerShimSock=/run/k3s/containerd/containerd.sock
+```
 ## Cleanup 
 1. Bring down the streaming service.
     ```sh
