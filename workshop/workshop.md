@@ -103,10 +103,6 @@ Now, that we have installed Akri, lets see what happened. Since the /dev/video1 
     kubectl apply -f https://raw.githubusercontent.com/deislabs/akri/main/deployment/samples/akri-video-streaming-app.yaml
     watch kubectl get pods
     ```
-    > **Note** We recently made changes to the streaming application. If it is failing, please apply an older version.
-    > ```sh
-    > kubectl apply -f https://raw.githubusercontent.com/kate-goldenring/akri/akri-workshop/deployment/samples/akri-video-streaming-app.yaml
-    >```
 1. Determine which port the service is running on. Be sure to save this port number for the next step.
     ```sh
    kubectl get service/akri-video-streaming-app --output=jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' && echo
