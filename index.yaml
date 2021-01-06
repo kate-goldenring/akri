@@ -3,7 +3,7 @@ entries:
   akri:
   - apiVersion: v2
     appVersion: 0.0.36
-    created: "2020-12-16T20:50:03.357258046Z"
+    created: "2021-01-06T16:48:12.277192378Z"
     description: A Helm chart for Akri
     digest: 1b6ba9af22f8e0a86f24105364fcb79248d3ad3787054a3c156c719b58c2edd2
     name: akri
@@ -13,7 +13,7 @@ entries:
     version: 0.0.36
   - apiVersion: v2
     appVersion: 0.0.35
-    created: "2020-12-16T20:50:03.356409155Z"
+    created: "2021-01-06T16:48:12.276178177Z"
     description: A Helm chart for Akri
     digest: a2f07d58121e44bc9137c69a68e4e00b36888230022386af08135f092d50957f
     name: akri
@@ -23,7 +23,7 @@ entries:
     version: 0.0.35
   - apiVersion: v2
     appVersion: 0.0.34
-    created: "2020-12-16T20:50:03.355400065Z"
+    created: "2021-01-06T16:48:12.275228275Z"
     description: A Helm chart for Akri
     digest: 7de3828affe7184c6bc9376092499cfd0afbf7d12c2bada21d9d85aeddbbea4f
     name: akri
@@ -33,8 +33,18 @@ entries:
     version: 0.0.34
   akri-dev:
   - apiVersion: v2
+    appVersion: 0.1.5
+    created: "2021-01-06T16:48:12.288762597Z"
+    description: A Helm chart for Akri development
+    digest: 09e5dcab8566a5c67a143941504e3d87145ad9af7dd4b1f2aea247a0be9e7651
+    name: akri-dev
+    type: application
+    urls:
+    - https://deislabs.github.io/akri/akri-dev-0.1.5.tgz
+    version: 0.1.5
+  - apiVersion: v2
     appVersion: 0.1.3
-    created: "2020-12-16T20:50:03.365930555Z"
+    created: "2021-01-06T16:48:12.287622095Z"
     description: A Helm chart for Akri development
     digest: 671473050b9d66408691c35f265503bb94761717b72a05d57faf0903867b1f7c
     name: akri-dev
@@ -44,7 +54,7 @@ entries:
     version: 0.1.3
   - apiVersion: v2
     appVersion: 0.1.2
-    created: "2020-12-16T20:50:03.364874666Z"
+    created: "2021-01-06T16:48:12.286415793Z"
     description: A Helm chart for Akri development
     digest: a91ec71f030e16918eac542e7c1f457bcf1b6a62e856ebecb31a9b5394fdbf71
     name: akri-dev
@@ -54,7 +64,7 @@ entries:
     version: 0.1.2
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2020-12-16T20:50:03.363840777Z"
+    created: "2021-01-06T16:48:12.284903991Z"
     description: A Helm chart for Akri development
     digest: eb9db5765e22c1ec6c102bf5e1a2a7128fe58ab6e8aa6a6c2894aaa3b196b333
     name: akri-dev
@@ -64,7 +74,7 @@ entries:
     version: 0.1.0
   - apiVersion: v2
     appVersion: 0.0.44
-    created: "2020-12-16T20:50:03.362736589Z"
+    created: "2021-01-06T16:48:12.282827988Z"
     description: A Helm chart for Akri development
     digest: d4b914f259f90e56f48d3512fbee88b02e67cd6989a97e5e02a826de1f9fea35
     name: akri-dev
@@ -74,7 +84,7 @@ entries:
     version: 0.0.44
   - apiVersion: v2
     appVersion: 0.0.43
-    created: "2020-12-16T20:50:03.361726999Z"
+    created: "2021-01-06T16:48:12.281862286Z"
     description: A Helm chart for Akri development
     digest: 6b0ca6077f0682f40a41448f78ae34f1d2c1aed946fca227b571038018535ddf
     name: akri-dev
@@ -84,7 +94,7 @@ entries:
     version: 0.0.43
   - apiVersion: v2
     appVersion: 0.0.42
-    created: "2020-12-16T20:50:03.360815609Z"
+    created: "2021-01-06T16:48:12.280866484Z"
     description: A Helm chart for Akri development
     digest: 30ff6f79eef3c0cc5ccf36c71d221b6312ade8056b1d98beadc3d23f0f3f3594
     name: akri-dev
@@ -94,7 +104,7 @@ entries:
     version: 0.0.42
   - apiVersion: v2
     appVersion: 0.0.41
-    created: "2020-12-16T20:50:03.359440123Z"
+    created: "2021-01-06T16:48:12.279214782Z"
     description: A Helm chart for Akri development
     digest: 514a7f5f83628cf0f5d27bfeaa0218ad2f0698cfcce1d7ef83bb777470d36584
     name: akri-dev
@@ -104,7 +114,7 @@ entries:
     version: 0.0.41
   - apiVersion: v2
     appVersion: 0.0.38
-    created: "2020-12-16T20:50:03.358065937Z"
+    created: "2021-01-06T16:48:12.27825208Z"
     description: A Helm chart for Akri development
     digest: 5d838eb7427ff09de715cc6524df7a7cc1ab7f21e84a1b123743434e2db17e34
     name: akri-dev
@@ -112,4 +122,4 @@ entries:
     urls:
     - https://deislabs.github.io/akri/akri-dev-0.0.38.tgz
     version: 0.0.38
-generated: "2020-12-16T20:50:03.354048979Z"
+generated: "2021-01-06T16:48:12.274121873Z"
