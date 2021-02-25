@@ -169,6 +169,8 @@ TAGS="v1"
 
 DH_IMAGE="${HOST}/${USER}/${DH}:${TAGS}"
 
+echo "/target" >> .dockerignore
+
 docker build \
 --tag=${DH_IMAGE} \
 --file=./Dockerfile.discovery-handler \
