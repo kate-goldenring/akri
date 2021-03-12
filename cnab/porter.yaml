@@ -13,7 +13,6 @@ tag: ghcr.io/squillace
 #dockerfile: Dockerfile.tmpl
 
 mixins:
-  - exec
   - helm3:
       clientVersion: v3.3.4
       repositories:
@@ -25,7 +24,7 @@ install:
       description: "Use Helm 3 to deploy the akri helm chart."
       upsert: true # uses "helm3 upgrade --install" instead of install. Can't use --replace.
       name: akri # parameterize
-      chart: akri-helm-charts/akri
+      chart: akri-helm-charts/akri-dev
 #      version: CHART_VERSION
       namespace: "{{bundle.parameters.akri-namespace}}"
 #      replace: true # removed to enable upsert behavior
@@ -34,18 +33,27 @@ install:
         useLatestContainers: true
         
 upgrade:
-  - exec:
-      description: "World 2.0"
-      command: bash
-      flags:
-          c: '"echo not yet implemented."'
-
+  - helm3:
+      description: "Using Helm 3 to upgrade the Akri Helm chart"
+      name: akri # parameterize
+      chart: akri-helm-charts/akri-dev
+      namespace: "{{bundle.parameters.akri-namespace}}"
+      resetValues: false
+      reuseValues: true
+      wait: true # default true
+      set:
+        onvif.enabled: "{{bundle.parameters.onvif-enabled}}"
+        udev.enabled: "{{bundle.parameters.udev-enabled}}"
+        udev.udevRules[0]: "{{bundle.parameters.udev-udevRules[0]}}"
+        udev.brokerPod.image.repository: "{{bundle.parameters.udev-brokerPod-image-repository}}"
+        udev.brokerPod.image.tag: "{{bundle.parameters.udev-brokerPod-image-tag}}"
+    
 uninstall:
   - helm3:
       description: "Deleting akri resources."
-      name: akri # parameterize
-      chart: akri-helm-charts/akri
       namespace: "{{bundle.parameters.akri-namespace}}"
+      releases:
+        - akri
 
 
 # Below is an example of how to define credentials
@@ -56,7 +64,33 @@ credentials:
 
 # Below is an example of how to define parameters
 # See https://porter.sh/author-bundles/#parameters
+# TODO: add all values from akri/deployment/helm/values.yaml
 parameters:
   - name: akri-namespace
     type: string
     default: default
+  - name: onvif-enabled
+    type: boolean
+    default: false
+  - name: udev-enabled
+    type: boolean
+    default: false
+  - name: udev-udevRules[0] # issues with quotations being propagated
+    type: string
+    default: ""
+  - name: udev-brokerPod-image-repository
+    type: string
+    default: ""
+  - name: udev-brokerPod-image-tag
+    type: string
+    default: ""
+
+# Flow
+# navigate to akri/cnab
+# porter build
+# porter install --cred kubeconfig
+# install onvif config: porter upgrade --cred kubeconfig --param onvif-enabled=true
+
+
+# udev (DOES NOT WORK): porter upgrade --cred kubeconfig --param udev-enabled=true --param udev-udevRules[0]="KERNEL=="video[0-9]*""
+# onvif: porter upgrade --cred kubeconfig --param onvif-enabled=true
