@@ -136,12 +136,7 @@ pub mod util {
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
         sync::{Arc, Mutex},
     };
-    use tokio::{
-        io::ErrorKind,
-        sync::{mpsc, mpsc::error::TryRecvError},
-        time,
-        time::Duration,
-    };
+    use tokio::{io::ErrorKind, sync::oneshot, time, time::Duration};
 
     fn create_onvif_discovery_message(uuid_string: &str) -> String {
         let probe_types: Vec<String> = vec![probe_types::NETWORK_VIDEO_TRANSMITTER.into()];
@@ -218,8 +213,11 @@ pub mod util {
     }
 
     pub async fn simple_onvif_discover(timeout: Duration) -> Result<Vec<String>, anyhow::Error> {
-        let (mut discovery_timeout_tx, mut discovery_timeout_rx) = mpsc::channel(2);
-        let (mut discovery_cancel_tx, mut discovery_cancel_rx) = mpsc::channel(2);
+        let (discovery_timeout_tx, discovery_timeout_rx) = oneshot::channel();
+        let (discovery_cancel_tx, mut discovery_cancel_rx): (
+            oneshot::Sender<()>,
+            oneshot::Receiver<()>,
+        ) = oneshot::channel();
         let shared_devices = Arc::new(Mutex::new(Vec::new()));
 
         let uuid_str = format!("uuid:{}", uuid::Uuid::new_v4());
@@ -294,15 +292,12 @@ pub mod util {
                             }
                             Err(e) => match e.kind() {
                                 ErrorKind::WouldBlock | ErrorKind::TimedOut => {
-                                    match discovery_cancel_rx.try_recv() {
-                                        Err(TryRecvError::Closed) | Ok(_) => {
-                                            trace!("simple_onvif_discover - recv_from error ... timeout signalled/disconnected (stop collecting responses): {:?}", e);
-                                            break;
-                                        }
-                                        Err(TryRecvError::Empty) => {
-                                            trace!("simple_onvif_discover - recv_from error ... no timeout (continue collecting responses): {:?}", e);
-                                            // continue looping
-                                        }
+                                    if discovery_cancel_tx.is_closed() {
+                                        trace!("simple_onvif_discover - recv_from error ... timeout signalled/disconnected (stop collecting responses): {:?}", e);
+                                        break;
+                                    } else {
+                                        trace!("simple_onvif_discover - recv_from error ... no timeout (continue collecting responses): {:?}", e);
+                                        // continue looping
                                     }
                                 }
                                 e => {
@@ -325,22 +320,18 @@ pub mod util {
                 },
             }
 
-            let _best_effort_send = discovery_timeout_tx.send(()).await;
+            let _best_effort_send = discovery_timeout_tx.send(());
             trace!("simple_onvif_discover - spawned thread exit");
         });
 
-        // Wait for timeout for discovery thread
-        let discovery_timeout_rx_result = time::timeout(
-            Duration::from_secs(timeout.as_secs()),
-            discovery_timeout_rx.recv(),
-        )
-        .await;
+        let discovery_timeout_rx_result = time::timeout(timeout, discovery_timeout_rx).await;
+
         trace!(
             "simple_onvif_discover - spawned thread finished or timeout: {:?}",
             discovery_timeout_rx_result
         );
         // Send cancel message to thread to ensure it doesn't hang around
-        let _best_effort_cancel = discovery_cancel_tx.send(()).await;
+        discovery_cancel_rx.close();
 
         let result_devices = shared_devices.lock().unwrap().clone();
         info!("simple_onvif_discover - devices: {:?}", result_devices);
@@ -355,7 +346,7 @@ pub mod util {
             time::{Duration, SystemTime},
         };
 
-        #[tokio::test(core_threads = 2)]
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
         async fn test_timeout_for_simple_onvif_discover() {
             let _ = env_logger::builder().is_test(true).try_init();
 
