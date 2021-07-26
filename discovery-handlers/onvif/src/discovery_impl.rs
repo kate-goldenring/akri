@@ -134,7 +134,7 @@ pub mod util {
     use super::{common, probe_types, to_deserialize, to_serialize};
     use akri_discovery_utils::filtering::{FilterList, FilterType};
     use log::{error, info, trace};
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
     use tokio::{
         io::ErrorKind,
         net::UdpSocket,
@@ -296,6 +296,38 @@ pub mod util {
         );
         socket
             .join_multicast_v4(MULTI_IPV4_ADDR, LOCAL_IPV4_ADDR)
+            .unwrap();
+
+        let envelope_as_string = create_onvif_discovery_message(&uuid_str);
+        socket
+            .send_to(&envelope_as_string.as_bytes(), multi_socket_addr)
+            .await?;
+        Ok(socket)
+    }
+
+    
+    pub async fn get_ipv6_socket() -> Result<UdpSocket, anyhow::Error> {
+        let uuid_str = format!("uuid:{}", uuid::Uuid::new_v4());
+        trace!("get_ipv6_socket - for {}", &uuid_str);
+        const LOCAL_IPV6_ADDR: Ipv6Addr = Ipv6Addr::UNSPECIFIED;
+        const LOCAL_PORT: u16 = 0;
+        let local_socket_addr = SocketAddr::new(IpAddr::V6(LOCAL_IPV6_ADDR), LOCAL_PORT);
+
+        // WS-Discovery multicast ip and port selected from available standard
+        // options.  See https://en.wikipedia.org/wiki/WS-Discovery
+        const MULTI_IPV6_ADDR: Ipv6Addr = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 0xC);
+        const MULTI_PORT: u16 = 3702;
+        let multi_socket_addr = SocketAddr::new(IpAddr::V6(MULTI_IPV6_ADDR), MULTI_PORT);
+
+        trace!("get_ipv6_socket - binding to: {:?}", local_socket_addr);
+        let mut socket = UdpSocket::bind(local_socket_addr).await.unwrap();
+        trace!(
+            "get_ipv6_socket - joining multicast: {:?} {:?}",
+            &MULTI_IPV6_ADDR, &LOCAL_IPV6_ADDR
+        );
+        const ANY_INTERFACE: u32 = 0;
+        socket
+            .join_multicast_v6(&MULTI_IPV6_ADDR, ANY_INTERFACE)
             .unwrap();
 
         let envelope_as_string = create_onvif_discovery_message(&uuid_str);

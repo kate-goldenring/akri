@@ -38,6 +38,18 @@ pub struct OnvifDiscoveryDetails {
     pub scopes: Option<FilterList>,
     #[serde(default = "default_discovery_timeout_seconds")]
     pub discovery_timeout_seconds: i32,
+    #[serde(default = "default_ip_type")]
+    pub ip_type: IPType,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum IPType {
+    V4,
+    V6,
+}
+
+fn default_ip_type() -> IPType {
+    IPType::V6
 }
 
 fn default_discovery_timeout_seconds() -> i32 {
@@ -80,7 +92,12 @@ impl DiscoveryHandler for DiscoveryHandlerImpl {
                 let onvif_query = OnvifQueryImpl {};
 
                 trace!("discover - filters:{:?}", &discovery_handler_config,);
-                let mut socket = util::get_discovery_response_socket().await.unwrap();
+                let mut socket = {
+                    match discovery_handler_config.ip_type {
+                        IPType::V4 => util::get_discovery_response_socket().await.unwrap(),
+                        IPType::V6 => util::get_ipv6_socket().await.unwrap(),
+                    }
+                };
                 let latest_cameras = util::simple_onvif_discover(
                     &mut socket,
                     discovery_handler_config.scopes.as_ref(),
@@ -276,6 +293,7 @@ mod tests {
             mac_addresses: None,
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         let instance = apply_filters(&onvif_config, mock_uri, &mock).await.unwrap();
 
@@ -306,6 +324,7 @@ mod tests {
             mac_addresses: None,
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         let instance = apply_filters(&onvif_config, mock_uri, &mock).await.unwrap();
 
@@ -334,6 +353,7 @@ mod tests {
             mac_addresses: None,
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         assert!(apply_filters(&onvif_config, mock_uri, &mock)
             .await
@@ -364,6 +384,7 @@ mod tests {
             mac_addresses: None,
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         let instance = apply_filters(&onvif_config, mock_uri, &mock).await.unwrap();
 
@@ -393,6 +414,7 @@ mod tests {
             mac_addresses: None,
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         assert!(apply_filters(&onvif_config, mock_uri, &mock)
             .await
@@ -423,6 +445,7 @@ mod tests {
             }),
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         let instance = apply_filters(&onvif_config, mock_uri, &mock).await.unwrap();
 
@@ -451,6 +474,7 @@ mod tests {
             }),
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         assert!(apply_filters(&onvif_config, mock_uri, &mock)
             .await
@@ -481,6 +505,7 @@ mod tests {
             }),
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         let instance = apply_filters(&onvif_config, mock_uri, &mock).await.unwrap();
 
@@ -510,6 +535,7 @@ mod tests {
             }),
             scopes: None,
             discovery_timeout_seconds: 1,
+            ip_type: IPType::V4,
         };
         assert!(apply_filters(&onvif_config, mock_uri, &mock)
             .await
