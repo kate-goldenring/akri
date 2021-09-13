@@ -39,6 +39,12 @@ pub trait DevicePluginBuilderInterface: Send + Sync {
         device: Device,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>;
 
+    async fn build_configuration_device_plugin(
+        &self,
+        config: &Configuration,
+        instance_map: InstanceMap,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>;
+
     async fn serve(
         &self,
         device_plugin_service: DevicePluginService,
@@ -117,6 +123,69 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
         Ok(())
     }
 
+    /// This creates a new DevicePluginService for an instance and registers it with the kubelet
+    async fn build_configuration_device_plugin(
+        &self,
+        config: &Configuration,
+        instance_map: InstanceMap,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+        let config_name = config.metadata.name.as_ref().unwrap();
+        info!(
+            "build_configuration_device_plugin - entered for configuration {}",
+            config_name
+        );
+        let capability_id: String = format!("{}/{}", AKRI_PREFIX, config_name);
+        let device_endpoint: String = format!("{}.sock", config_name);
+        let socket_path: String = Path::new(DEVICE_PLUGIN_PATH)
+            .join(device_endpoint.clone())
+            .to_str()
+            .unwrap()
+            .to_string();
+        let (list_and_watch_message_sender, _) =
+            broadcast::channel(LIST_AND_WATCH_MESSAGE_CHANNEL_CAPACITY);
+        let (server_ender_sender, server_ender_receiver) =
+            mpsc::channel(DEVICE_PLUGIN_SERVER_ENDER_CHANNEL_CAPACITY);
+        // TODO make specifying a device optional
+        let device = Device {
+            id: "TODO".to_string(),
+            properties: std::collections::HashMap::new(),
+            mounts: Vec::new(),
+            device_specs: Vec::new(),
+        };
+        let device_plugin_service = DevicePluginService {
+            instance_name: config_name.clone(),
+            endpoint: device_endpoint.clone(),
+            config: config.spec.clone(),
+            config_name: config.metadata.name.clone().unwrap(),
+            config_uid: config.metadata.uid.as_ref().unwrap().clone(),
+            config_namespace: config.metadata.namespace.as_ref().unwrap().clone(),
+            shared: false,
+            node_name: env::var("AGENT_NODE_NAME")?,
+            instance_map,
+            list_and_watch_message_sender,
+            server_ender_sender: server_ender_sender.clone(),
+            device,
+        };
+
+        self.serve(
+            device_plugin_service,
+            socket_path.clone(),
+            server_ender_receiver,
+        )
+        .await?;
+
+        self.register(
+            &capability_id,
+            &device_endpoint,
+            &config_name,
+            server_ender_sender,
+            KUBELET_SOCKET,
+        )
+        .await?;
+
+        Ok(())
+    }
+
     // This starts a DevicePluginServer
     async fn serve(
         &self,
@@ -128,6 +197,9 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
             "serve - creating a device plugin server that will listen at: {}",
             socket_path
         );
+        tokio::fs::remove_file(Path::new(&socket_path[..]))
+            .await
+            .ok();
         tokio::fs::create_dir_all(Path::new(&socket_path[..]).parent().unwrap())
             .await
             .expect("Failed to create dir at socket path");

@@ -430,9 +430,11 @@ impl DiscoveryOperator {
                         instance
                     );
                     let list_and_watch_message_sender = instance_info.list_and_watch_message_sender;
+                    //TODO dont clone device here
                     let updated_instance_info = InstanceInfo {
                         connectivity_status: InstanceConnectivityStatus::Online,
                         list_and_watch_message_sender: list_and_watch_message_sender.clone(),
+                        device: instance_info.device.clone(),
                     };
                     self.instance_map
                         .lock()
@@ -462,6 +464,7 @@ impl DiscoveryOperator {
                             remove_instance = true;
                         } else {
                             let sender = instance_info.list_and_watch_message_sender.clone();
+                            // tODO: modify instance info instead
                             let updated_instance_info = InstanceInfo {
                                 connectivity_status: InstanceConnectivityStatus::Offline(
                                     Instant::now(),
@@ -469,6 +472,7 @@ impl DiscoveryOperator {
                                 list_and_watch_message_sender: instance_info
                                     .list_and_watch_message_sender
                                     .clone(),
+                                device: instance_info.device.clone(),
                             };
                             self.instance_map
                                 .lock()
@@ -521,6 +525,7 @@ pub mod start_discovery {
     #[double]
     pub use super::DiscoveryOperator;
     use super::StreamType;
+    use super::{DevicePluginBuilder, DevicePluginBuilderInterface};
     use akri_shared::k8s;
     use mockall_double::double;
     use std::{sync::Arc, time::Duration};
@@ -548,7 +553,14 @@ pub mod start_discovery {
         );
         let config_name = config.metadata.name.clone().unwrap();
         let mut tasks = Vec::new();
+        let instance_map = discovery_operator.get_instance_map();
         let discovery_operator = Arc::new(discovery_operator);
+
+        // Create a device plugin for the Configuration
+        let device_plugin_builder = DevicePluginBuilder {};
+        device_plugin_builder
+            .build_configuration_device_plugin(&config, instance_map)
+            .await?;
 
         // Call discover on already registered Discovery Handlers requested by this Configuration's
         let known_dh_discovery_operator = discovery_operator.clone();
@@ -925,6 +937,7 @@ pub mod tests {
                         InstanceInfo {
                             list_and_watch_message_sender,
                             connectivity_status: connectivity_status.clone(),
+                            device: device.clone(),
                         },
                     )
                 })
