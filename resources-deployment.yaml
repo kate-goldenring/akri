@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: debug-resources-broker-deployment
+  labels:
+    app: debug-resources-broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: debug-resources-broker
+  template:
+    metadata:
+      labels:
+        app: debug-resources-broker
+    spec:
+      containers:
+      - name: debug-resources-broker
+        image: nginx
+        resources:
+          limits:                        
+            akri.sh/akri-debug-echo: "3"

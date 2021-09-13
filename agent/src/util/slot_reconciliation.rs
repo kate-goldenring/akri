@@ -310,7 +310,7 @@ impl DevicePluginSlotReconciler {
 pub async fn periodic_slot_reconciliation(
     slot_grace_period: std::time::Duration,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    trace!("periodic_slot_reconciliation - start");
+    // trace!("periodic_slot_reconciliation - start");
     let kube_interface = akri_shared::k8s::KubeImpl::new().await?;
     let node_name = std::env::var("AGENT_NODE_NAME").unwrap();
     let crictl_path = std::env::var("HOST_CRICTL_PATH").unwrap();
@@ -327,18 +327,18 @@ pub async fn periodic_slot_reconciliation(
     };
 
     loop {
-        trace!("periodic_slot_reconciliation - iteration pre sleep");
+        // trace!("periodic_slot_reconciliation - iteration pre sleep");
         tokio::time::sleep(std::time::Duration::from_secs(
             SLOT_RECONCILIATION_CHECK_DELAY_SECS,
         ))
         .await;
 
-        trace!("periodic_slot_reconciliation - iteration call reconiler.reconcile");
+        // trace!("periodic_slot_reconciliation - iteration call reconiler.reconcile");
         reconciler
             .reconcile(&node_name, slot_grace_period, &slot_query, &kube_interface)
             .await;
 
-        trace!("periodic_slot_reconciliation - iteration end");
+        // trace!("periodic_slot_reconciliation - iteration end");
     }
 }
 

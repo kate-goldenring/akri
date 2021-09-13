@@ -24,7 +24,7 @@ use util::{
         NEW_DISCOVERY_HANDLER_CHANNEL_CAPACITY, SLOT_RECONCILIATION_SLOT_GRACE_PERIOD_SECS,
     },
     registration::{run_registration_server, DiscoveryHandlerName},
-    slot_reconciliation::periodic_slot_reconciliation,
+    // slot_reconciliation::periodic_slot_reconciliation,
 };
 
 lazy_static! {
@@ -75,12 +75,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
             .unwrap();
     }));
 
-    tasks.push(tokio::spawn(async move {
-        let slot_grace_period = Duration::from_secs(SLOT_RECONCILIATION_SLOT_GRACE_PERIOD_SECS);
-        periodic_slot_reconciliation(slot_grace_period)
-            .await
-            .unwrap();
-    }));
+    // tasks.push(tokio::spawn(async move {
+    //     let slot_grace_period = Duration::from_secs(SLOT_RECONCILIATION_SLOT_GRACE_PERIOD_SECS);
+    //     periodic_slot_reconciliation(slot_grace_period)
+    //         .await
+    //         .unwrap();
+    // }));
 
     tasks.push(tokio::spawn(async move {
         config_action::do_config_watch(discovery_handler_map, new_discovery_handler_sender_clone)
