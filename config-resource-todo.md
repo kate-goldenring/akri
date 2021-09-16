@@ -5,3 +5,5 @@
 - panicking when instances deleted
 - handle mutex locking to clear slot when not in use
 - write tests
+- Inheritance for generic dp impl: https://riptutorial.com/rust/example/22917/inheritance-with-traits
+- cant enforce capacity for both config and instance level resources
