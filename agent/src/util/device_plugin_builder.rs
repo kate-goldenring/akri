@@ -17,11 +17,11 @@ use futures::TryFutureExt;
 use log::{info, trace};
 #[cfg(test)]
 use mockall::{automock, predicate::*};
-use std::{convert::TryFrom, env, path::Path, time::SystemTime};
+use std::{collections::HashMap, convert::TryFrom, env, path::Path, sync::Arc, time::SystemTime};
 use tokio::{
     net::UnixListener,
     net::UnixStream,
-    sync::{broadcast, mpsc},
+    sync::{broadcast, mpsc, Mutex, RwLock},
     task,
 };
 use tonic::transport::{Endpoint, Server, Uri};
@@ -102,6 +102,7 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
             list_and_watch_message_sender,
             server_ender_sender: server_ender_sender.clone(),
             device,
+            slot_map: Arc::new(RwLock::new(HashMap::new())),
         };
 
         self.serve(
@@ -165,6 +166,7 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
             list_and_watch_message_sender,
             server_ender_sender: server_ender_sender.clone(),
             device,
+            slot_map: Arc::new(RwLock::new(HashMap::new())),
         };
 
         self.serve(

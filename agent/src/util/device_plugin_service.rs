@@ -26,7 +26,7 @@ use mock_instant::Instant;
 use std::time::Instant;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{
-    sync::{broadcast, mpsc, Mutex},
+    sync::{broadcast, mpsc, Mutex, RwLock},
     time::timeout,
 };
 use tokio_stream::wrappers::ReceiverStream;
@@ -107,6 +107,7 @@ pub struct DevicePluginService {
     /// into requesting Pods.
     /// Is stored in InstanceMap upon Instance creation.
     pub device: Device,
+    pub slot_map: Arc<RwLock<HashMap<String, String>>>,
 }
 
 #[tonic::async_trait]
@@ -390,6 +391,17 @@ impl DevicePluginService {
             let mut envs = self.config.broker_properties.clone();
             let mut mounts = Vec::new();
             let mut device_specs = Vec::new();
+            // Get instances to be allocated to
+            let mut instances_to_use: Vec<String> =
+                self.instance_map.lock().await.keys().cloned().collect();
+            trace!(
+                "internal_allocate_for_configuration - instances to choose from are {:?}",
+                instances_to_use
+            );
+            trace!(
+                "internal_allocate_for_configuration - slot map at beginning is {:?}",
+                self.slot_map.read().await
+            );
             for device_usage_id in request.devices_i_ds {
                 trace!(
                     "internal_allocate_for_configuration - for Configuration {} processing request for device usage slot id {}",
@@ -402,30 +414,50 @@ impl DevicePluginService {
                     device_usage_id.clone(),
                 );
 
-                // If is a configuration, get the name of the instance by parsing the device ID
-                // TODO dont assume entry # btw 0-9
-                let instance_name = &device_usage_id[0..device_usage_id.len() - 2];
+                // 1) Check map <SlotName, InstanceSlotName> to see if already allocated and needs to be reset
+                //  // If none, pop instance from set and reserve slot in the instance. Store result as entry in map.
+                //  // TODO: somehow check if no slots left
+                if let Some(v) = self.slot_map.read().await.get(&device_usage_id) {
+                    trace!("SLOT USED BEFORE");
+                    let instance_name = &v[0..v.len() - 2];
+                    if let Err(e) = try_update_instance_device_usage(
+                        &v,
+                        &self.node_name,
+                        instance_name,
+                        &self.config_namespace,
+                        kube_interface.clone(),
+                    )
+                    .await
+                    {
+                        error!("internal_allocate_for_configuration - kubelet request for {} cannot be granted with error {:?}", device_usage_id, e);
+
+                        // TODO: force the appropriate instance's list and watch to continue
+                        // if e.code() != Code::AlreadyExists {
+                        //     // Assume that slot emptied
+                        // this will lock the mutex
+                        //     self.slot_map.lock().await.remove(&device_usage_id);
+                        //     return Err(e);
+                        // }
+                    }
+
+                    // Assume that slot emptied
+                    // trace!("internal_allocate_for_configuration - kubelet request for {} caused slot to be cleared", device_usage_id);
+                }
+
+                let instance_device_usage_id = assign_instance_device_usage_slot(
+                    &self.node_name,
+                    &instances_to_use.pop().unwrap(),
+                    &self.config_namespace,
+                    kube_interface.clone(),
+                )
+                .await?;
+                let instance_name =
+                    &instance_device_usage_id[0..instance_device_usage_id.len() - 2];
                 trace!(
                     "internal_allocate_for_configuration - parsed instance name is {} for slot {}",
                     instance_name,
                     device_usage_id
                 );
-
-                if let Err(e) = try_update_instance_device_usage(
-                    &device_usage_id,
-                    &self.node_name,
-                    instance_name,
-                    &self.config_namespace,
-                    kube_interface.clone(),
-                )
-                .await
-                {
-                    trace!("internal_allocate_for_configuration - could not assign {} slot to {} node ... forcing list_and_watch to continue", device_usage_id, &self.node_name);
-                    self.list_and_watch_message_sender
-                        .send(ListAndWatchMessageKind::Continue)
-                        .unwrap();
-                    return Err(e);
-                }
 
                 let mut device = self
                     .instance_map
@@ -448,6 +480,13 @@ impl DevicePluginService {
                     "internal_allocate_for_configuration - finished processing device_usage_id {}",
                     device_usage_id
                 );
+
+                // Store in instance map
+                // TODO: recovery logic if any of the instance requests fail
+                self.slot_map
+                    .write()
+                    .await
+                    .insert(device_usage_id, instance_device_usage_id);
             }
 
             // Successfully reserved device_usage_slot[s] for this node.
@@ -463,6 +502,10 @@ impl DevicePluginService {
         trace!(
             "internal_allocate_for_configuration - for Configuration {} returning responses",
             &self.instance_name
+        );
+        trace!(
+            "internal_allocate_for_configuration - slot map at end is {:?}",
+            self.slot_map.read().await
         );
         Ok(Response::new(v1beta1::AllocateResponse {
             container_responses,
@@ -529,7 +572,7 @@ fn get_slot_value(
         } else if allocated_node == node_name {
             Ok("".to_string())
         } else {
-            trace!("internal_allocate - request for device slot {} previously claimed by a diff node {} than this one {} ... indicates the device on THIS node must be marked unhealthy, invoking ListAndWatch ... returning failure, next scheduling should succeed!", device_usage_id, allocated_node, node_name);
+            trace!("get_slot_value - request for device slot {} previously claimed by a diff node {} than this one {} ... indicates the device on THIS node must be marked unhealthy, invoking ListAndWatch ... returning failure, next scheduling should succeed!", device_usage_id, allocated_node, node_name);
             Err(Status::new(
                 Code::Unknown,
                 "Requested device already in use",
@@ -538,7 +581,7 @@ fn get_slot_value(
     } else {
         // No corresponding id found
         trace!(
-            "internal_allocate - could not find {} id in device_usage",
+            "get_slot_value - could not find {} id in device_usage",
             device_usage_id
         );
         Err(Status::new(
@@ -546,6 +589,70 @@ fn get_slot_value(
             "Could not find device usage slot",
         ))
     }
+}
+
+/// TODO modify This tries up to `MAX_INSTANCE_UPDATE_TRIES` to update the requested slot of the Instance with the appropriate value (either "" to clear slot or node_name).
+/// It cannot be assumed that this will successfully update Instance on first try since Device Plugins on other nodes may be simultaneously trying to update the Instance.
+/// This returns an error if slot does not need to be updated or `MAX_INSTANCE_UPDATE_TRIES` attempted.
+async fn assign_instance_device_usage_slot(
+    node_name: &str,
+    instance_name: &str,
+    instance_namespace: &str,
+    kube_interface: Arc<impl KubeInterface>,
+) -> Result<String, Status> {
+    trace!("assign_instance_device_usage_slot - entered");
+    let mut instance: InstanceSpec;
+    for x in 0..MAX_INSTANCE_UPDATE_TRIES {
+        // Grab latest instance
+        match kube_interface
+            .find_instance(instance_name, instance_namespace)
+            .await
+        {
+            Ok(instance_object) => instance = instance_object.spec,
+            Err(_) => {
+                trace!(
+                    "internal_allocate - could not find Instance {}",
+                    instance_name
+                );
+                return Err(Status::new(
+                    Code::Unknown,
+                    format!("Could not find Instance {}", instance_name),
+                ));
+            }
+        }
+
+        let mut slot = String::new();
+        for (k, v) in instance.device_usage.iter_mut() {
+            if v.is_empty() {
+                slot = k.clone();
+                *v = node_name.to_string();
+                break;
+            }
+        }
+
+        match kube_interface
+            .update_instance(&instance, instance_name, instance_namespace)
+            .await
+        {
+            Ok(()) => {
+                // if value == node_name {
+                //     return Ok(());
+                // } else {
+                //     return Err(Status::new(Code::Unknown, "Devices are in inconsistent state, updated device usage, please retry scheduling"));
+                // }
+                // TODO: what if instance dp requested at same time?
+                return Ok(slot);
+            }
+            Err(e) => {
+                if x == (MAX_INSTANCE_UPDATE_TRIES - 1) {
+                    trace!("internal_allocate - update_instance returned error [{}] after max tries ... returning error", e);
+                    return Err(Status::new(Code::Unknown, "Could not update Instance"));
+                }
+            }
+        }
+        random_delay().await;
+    }
+    Err(Status::new(Code::Unknown, "Could not update Instance"))
 }
 
 /// This tries up to `MAX_INSTANCE_UPDATE_TRIES` to update the requested slot of the Instance with the appropriate value (either "" to clear slot or node_name).
@@ -585,6 +692,11 @@ async fn try_update_instance_device_usage(
         //          slot (which triggers each node to set the slot as Healthy) to
         //          allow a fair rescheduling of the workload
         let value = get_slot_value(device_usage_id, node_name, &instance)?;
+        trace!(
+            "try_update_instance_device_usage - updating instance slot {} with value {}",
+            device_usage_id,
+            value
+        );
         instance
             .device_usage
             .insert(device_usage_id.to_string(), value.clone());
@@ -597,7 +709,7 @@ async fn try_update_instance_device_usage(
                 if value == node_name {
                     return Ok(());
                 } else {
-                    return Err(Status::new(Code::Unknown, "Devices are in inconsistent state, updated device usage, please retry scheduling"));
+                    return Err(Status::new(Code::AlreadyExists, "Devices are in inconsistent state, updated device usage, please retry scheduling"));
                 }
             }
             Err(e) => {
@@ -1096,6 +1208,7 @@ mod device_plugin_service_tests {
             list_and_watch_message_sender,
             server_ender_sender,
             device,
+            slot_map: Arc::new(RwLock::new(HashMap::new())),
         };
         (
             dps,
@@ -1810,6 +1923,107 @@ mod device_plugin_service_tests {
                 panic!("internal allocate is expected to fail due to invalid device usage slot")
             }
             Err(e) => assert_eq!(e.message(), "Could not find device usage slot"),
+        }
+        assert_eq!(
+            device_plugin_service_receivers
+                .list_and_watch_message_receiver
+                .recv()
+                .await
+                .unwrap(),
+            ListAndWatchMessageKind::Continue
+        );
+    }
+
+    // Test when device_usage[id] == ""
+    // internal_allocate should set device_usage[id] = m.nodeName, return
+    #[tokio::test]
+    async fn test_internal_allocate_fo_config_success() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let (device_plugin_service, mut device_plugin_service_receivers) =
+            create_device_plugin_service(InstanceConnectivityStatus::Online, true);
+        let node_name = device_plugin_service.node_name.clone();
+        let mut mock = MockKubeInterface::new();
+        let request = setup_internal_allocate_tests(
+            &mut mock,
+            &device_plugin_service,
+            String::new(),
+            node_name,
+        );
+        assert!(device_plugin_service
+            .internal_allocate_for_config(request, Arc::new(mock),)
+            .await
+            .is_ok());
+        // assert!(device_plugin_service_receivers
+        //     .list_and_watch_message_receiver
+        //     .try_recv()
+        //     .is_err());
+    }
+
+    // Test when device_usage[id] == self.nodeName
+    // Expected behavior: internal_allocate should set device_usage[id] == "", invoke list_and_watch, and return error
+    #[tokio::test]
+    async fn test_internal_allocate_deallocate_config() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let (device_plugin_service, mut device_plugin_service_receivers) =
+            create_device_plugin_service(InstanceConnectivityStatus::Online, true);
+        let mut mock = MockKubeInterface::new();
+        let request = setup_internal_allocate_tests(
+            &mut mock,
+            &device_plugin_service,
+            "node-a".to_string(),
+            String::new(),
+        );
+        match device_plugin_service
+            .internal_allocate(request, Arc::new(mock))
+            .await
+        {
+            Ok(_) => {
+                panic!("internal allocate is expected to fail due to devices being in bad state")
+            }
+            Err(e) => assert_eq!(
+                e.message(),
+                "Devices are in inconsistent state, updated device usage, please retry scheduling"
+            ),
+        }
+        assert_eq!(
+            device_plugin_service_receivers
+                .list_and_watch_message_receiver
+                .recv()
+                .await
+                .unwrap(),
+            ListAndWatchMessageKind::Continue
+        );
+    }
+
+    // Tests when device_usage[id] == <another node>
+    // Expected behavior: should invoke list_and_watch, and return error
+    #[tokio::test]
+    async fn test_internal_allocate_taken_config() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let (device_plugin_service, mut device_plugin_service_receivers) =
+            create_device_plugin_service(InstanceConnectivityStatus::Online, true);
+        let device_usage_id_slot = format!("{}-0", device_plugin_service.instance_name);
+        let mut mock = MockKubeInterface::new();
+        configure_find_instance(
+            &mut mock,
+            "../test/json/local-instance.json",
+            device_plugin_service.instance_name.clone(),
+            device_plugin_service.config_namespace.clone(),
+            "other".to_string(),
+            NodeName::ThisNode,
+            None,
+        );
+        let devices_i_ds = vec![device_usage_id_slot];
+        let container_requests = vec![v1beta1::ContainerAllocateRequest { devices_i_ds }];
+        let requests = Request::new(AllocateRequest { container_requests });
+        match device_plugin_service
+            .internal_allocate(requests, Arc::new(mock))
+            .await
+        {
+            Ok(_) => panic!(
+                "internal allocate is expected to fail due to requested device already being used"
+            ),
+            Err(e) => assert_eq!(e.message(), "Requested device already in use"),
         }
         assert_eq!(
             device_plugin_service_receivers

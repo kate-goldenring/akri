@@ -1,0 +1,7 @@
+- Shutdown config level device plugin on config deletion
+- overwrites the annotations it sets:  `setting annotations {"akri.agent.slot": "akri-debug-echo-a19705-0"}`
+- change virtual device names to be config
+- have instance creation trigger configuration level device plugin to update kubelet
+- panicking when instances deleted
+- handle mutex locking to clear slot when not in use
+- write tests
