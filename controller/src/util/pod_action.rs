@@ -36,6 +36,7 @@ pub struct PodActionInfo {
     pub status_start_time: Option<Time>,
     pub unknown_node: bool,
     pub trace_node_name: String,
+    pub is_job: bool,
 }
 
 impl PodActionInfo {
@@ -187,11 +188,16 @@ impl PodActionInfo {
                 Ok(PodAction::Remove)
             }
             _ => {
+                // DO THIS IF USING JOB API
+                // if self.is_job {
+                //     Ok(PodAction::Remove)
+                // } else {
                 //
                 // For Non-Running pods (with our controller's selector), if the Instance is !removed (added|updated),
                 // we will look at the start_time to determine what to do.
                 //
                 self.time_choice_for_non_running_pods(grace_period_in_minutes)
+                // }
             }
         }
     }
@@ -200,7 +206,7 @@ impl PodActionInfo {
     fn choice_for_pods_on_known_nodes(
         &self,
     ) -> Result<PodAction, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        log::trace!(
+        log::info!(
             "choice_for_pods_on_known_nodes phase={:?} action={:?} trace_node_name={:?}",
             &self.phase,
             self.instance_action,
@@ -243,11 +249,15 @@ impl PodActionInfo {
                     // For pods that are Pending (with our controller's selector) ...
                     //
                     self.choice_for_non_running_pods(self.pending_grace_time_in_minutes)
-                } else {
-                    //
-                    // For pods that are not running (with our controller's selector) ...
-                    //
-                    self.choice_for_non_running_pods(self.ended_grace_time_in_minutes)
+                } else { 
+                    if self.is_job && self.phase.as_str() == "Succeeded" {
+                        Ok(PodAction::Remove)
+                    } else {
+                        //
+                        // For pods that are not running (with our controller's selector) ...
+                        //
+                        self.choice_for_non_running_pods(self.ended_grace_time_in_minutes)
+                    }
                 }
             }
         }
@@ -332,6 +342,7 @@ mod controller_tests {
                             status_start_time: start_time.clone(),
                             unknown_node: true,
                             trace_node_name: "foo".to_string(),
+                            is_job: false,
                         };
                         assert_eq!(map_tuple.1, pod_action_info.select_pod_action().unwrap());
                     });
@@ -370,6 +381,7 @@ mod controller_tests {
                         status_start_time: start_time.clone(),
                         unknown_node: false,
                         trace_node_name: "foo".to_string(),
+                        is_job: false,
                     };
                     assert_eq!(map_tuple.1, pod_action_info.select_pod_action().unwrap());
                 });
@@ -413,6 +425,7 @@ mod controller_tests {
                         status_start_time: start_time.clone(),
                         unknown_node: false,
                         trace_node_name: "foo".to_string(),
+                        is_job: false,
                     };
                     assert_eq!(map_tuple.1, pod_action_info1.select_pod_action().unwrap());
                 });
@@ -451,6 +464,7 @@ mod controller_tests {
                         status_start_time: start_time.clone(),
                         unknown_node: false,
                         trace_node_name: "foo".to_string(),
+                        is_job: false,
                     };
                     assert_eq!(map_tuple.1, pod_action_info.select_pod_action().unwrap());
                 });
@@ -487,6 +501,7 @@ mod controller_tests {
                     status_start_time: start_time.clone(),
                     unknown_node: false,
                     trace_node_name: "foo".to_string(),
+                    is_job: false,
                 };
                 assert_eq!(map_tuple.1, pod_action_info.select_pod_action().unwrap());
             });
@@ -531,6 +546,7 @@ mod controller_tests {
                         status_start_time: start_time.clone(),
                         unknown_node: false,
                         trace_node_name: "foo".to_string(),
+                        is_job: false,
                     };
                     assert_eq!(map_tuple.1, pod_action_info1.select_pod_action().unwrap());
                 });

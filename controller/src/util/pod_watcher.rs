@@ -6,7 +6,7 @@ use akri_shared::{
     k8s,
     k8s::{
         pod::{
-            AKRI_CONFIGURATION_LABEL_NAME, AKRI_INSTANCE_LABEL_NAME, AKRI_TARGET_NODE_LABEL_NAME,
+            AKRI_CONFIGURATION_LABEL_NAME, AKRI_IS_JOB_LABEL, AKRI_JOB_ACTUAL_STATE_LABEL, AKRI_INSTANCE_LABEL_NAME, AKRI_TARGET_NODE_LABEL_NAME,
         },
         service, KubeInterface, OwnershipInfo, OwnershipType,
     },
@@ -125,7 +125,7 @@ impl BrokerPodWatcher {
         kube_interface: &impl KubeInterface,
         first_event: &mut bool,
     ) -> anyhow::Result<()> {
-        trace!("handle_pod - enter [event: {:?}]", event);
+        trace!("handle_pod - enter");
         match event {
             Event::Applied(pod) => {
                 info!(
@@ -318,7 +318,14 @@ impl BrokerPodWatcher {
         .await?;
 
         // Make sure instance has required Pods
-        if let Ok(instance) = kube_interface.find_instance(&instance_id, namespace).await {
+        if let Ok(mut instance) = kube_interface.find_instance(&instance_id, namespace).await {
+            // Check if is a job. If so, set actual state to "", showing that pod has completed but Agent has yet to fill the value
+            if instance.spec.broker_properties.contains_key(AKRI_IS_JOB_LABEL) {
+                if !instance.spec.broker_properties.contains_key(AKRI_JOB_ACTUAL_STATE_LABEL) {
+                    instance.spec.broker_properties.insert(AKRI_JOB_ACTUAL_STATE_LABEL.to_string(), String::new());
+                }
+            }
+            kube_interface.update_instance(&instance.spec, &instance_id, namespace).await?;
             super::instance_action::handle_instance_change(
                 &instance,
                 &super::instance_action::InstanceAction::Update,

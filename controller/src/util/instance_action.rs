@@ -5,7 +5,7 @@ use akri_shared::{
     k8s,
     k8s::{
         pod,
-        pod::{AKRI_INSTANCE_LABEL_NAME, AKRI_TARGET_NODE_LABEL_NAME},
+        pod::{AKRI_INSTANCE_LABEL_NAME, AKRI_IS_JOB_LABEL, AKRI_JOB_DESIRED_STATE_LABEL, AKRI_JOB_ACTUAL_STATE_LABEL, AKRI_TARGET_NODE_LABEL_NAME},
         KubeInterface, OwnershipInfo, OwnershipType,
     },
 };
@@ -206,6 +206,11 @@ fn determine_action_for_pod(
         return;
     }
 
+    let is_job = match labels.get(AKRI_IS_JOB_LABEL) {
+        Some(_) => true,
+        None => false,
+    };
+
     let mut update_pod_context = PodContext {
         node_name: Some(node_to_run_pod_on.to_string()),
         namespace: k8s_pod.metadata.namespace.clone(),
@@ -223,6 +228,7 @@ fn determine_action_for_pod(
         status_start_time: pod_start_time,
         unknown_node: !nodes_to_act_on.contains_key(node_to_run_pod_on),
         trace_node_name: k8s_pod.metadata.name.clone().unwrap(),
+        is_job,
     };
     update_pod_context.action = match pod_action_info.select_pod_action() {
         Ok(action) => action,
@@ -359,6 +365,11 @@ async fn handle_addition_work(
     );
 
     if let Some(broker_pod_spec) = &instance_configuration.spec.broker_pod_spec {
+        // Check if it is a job
+        // TODO: Check if the job has succeeded
+        // TODO make this a useful broker property that is being searched for based on some
+        // new Configuration field like JobStatusProperty
+        let is_job = instance_configuration.spec.broker_properties.contains_key(AKRI_IS_JOB_LABEL);
         let capability_id = format!("{}/{}", AKRI_PREFIX, instance_name);
         let new_pod = pod::create_new_pod_from_spec(
             instance_namespace,
@@ -373,6 +384,7 @@ async fn handle_addition_work(
             &new_node.to_string(),
             instance_shared,
             broker_pod_spec,
+            is_job,
         )?;
 
         trace!("handle_addition_work - New pod spec={:?}", new_pod);
@@ -387,6 +399,26 @@ async fn handle_addition_work(
     }
     trace!("handle_addition_work - POST nodeInfo.SetNode \n");
     Ok(())
+}
+
+/// Checks if job should be run on nodes by comparing desired state to actual state.
+fn run_jobs_check(instance: &Instance) -> anyhow::Result<bool> {
+    // Desired state should always be specified
+    let desired_state = instance.spec.broker_properties.get(AKRI_JOB_DESIRED_STATE_LABEL).ok_or_else(|| anyhow::anyhow!("Instance with Job brokers does not have desired state in properties"))?;
+    // Actual state should be set after first completion. Assume job has not run yet if not set and return true
+    match instance.spec.broker_properties.get(AKRI_JOB_ACTUAL_STATE_LABEL) {
+        Some(actual_state) => Ok(do_state_comparison(desired_state, actual_state).unwrap_or(true)),
+        None => Ok(true)
+    }
+    
+}
+
+/// Ideally (TODO): Compares the job states using the method indicated in a Configuration
+/// For now, returns false so long as actual state is an empty string which the controller sets after Job completion
+/// v2, assumes integer state values and returns true so long as actual == desired
+fn do_state_comparison(desired_state: &str, actual_state: &str) -> anyhow::Result<bool> {
+    Ok(!actual_state.is_empty())
+    // Ok(actual_state.parse::<i32>()? == desired_state.parse::<i32>()?)
 }
 
 /// Handle Instance change by watching for node
@@ -412,10 +444,16 @@ pub async fn handle_instance_change(
 
     // If InstanceAction::Remove, assume all nodes require PodAction::NoAction (reflect that there is no running Pod unless we find one)
     // Otherwise, assume all nodes require PodAction::Add (reflect that there is no running Pod, unless we find one)
-    let default_action = match action {
+    let mut default_action = match action {
         InstanceAction::Remove => PodAction::NoAction,
         _ => PodAction::Add,
     };
+    // Check if the Instance has Job brokers and they have achieved the correct state.
+    // This means that new brokers should not be deployed and should return early.
+    if instance.spec.broker_properties.contains_key(AKRI_IS_JOB_LABEL) && !run_jobs_check(instance)? {
+        default_action = PodAction::NoAction;
+    }
+
     let mut nodes_to_act_on: HashMap<String, PodContext> = instance
         .spec
         .nodes

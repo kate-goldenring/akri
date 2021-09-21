@@ -4,9 +4,10 @@ use super::{
 };
 use either::Either;
 use k8s_openapi::api::core::v1::{
-    Affinity, NodeAffinity, NodeSelector, NodeSelectorRequirement, NodeSelectorTerm, Pod, PodSpec,
+    Affinity, NodeAffinity, NodeSelector, NodeSelectorRequirement, NodeSelectorTerm, Pod, PodSpec, PodTemplateSpec,
     ResourceRequirements,
 };
+use k8s_openapi::api::batch::v1::{Job, JobSpec};
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::{
@@ -21,6 +22,9 @@ pub const CONTROLLER_LABEL_ID: &str = "controller";
 pub const AKRI_CONFIGURATION_LABEL_NAME: &str = "akri.sh/configuration";
 pub const AKRI_INSTANCE_LABEL_NAME: &str = "akri.sh/instance";
 pub const AKRI_TARGET_NODE_LABEL_NAME: &str = "akri.sh/target-node";
+pub const AKRI_IS_JOB_LABEL: &str = "akri.sh/is-job";
+pub const AKRI_JOB_DESIRED_STATE_LABEL: &str = "akri.sh/job-desired-state";
+pub const AKRI_JOB_ACTUAL_STATE_LABEL: &str = "akri.sh/job-actual-state";
 
 /// Get Kubernetes Pods with a given label or field selector
 ///
@@ -155,6 +159,7 @@ pub fn create_new_pod_from_spec(
     node_to_run_pod_on: &str,
     capability_is_shared: bool,
     pod_spec: &PodSpec,
+    is_job: bool,
 ) -> anyhow::Result<Pod> {
     trace!("create_new_pod_from_spec enter");
 
@@ -179,6 +184,13 @@ pub fn create_new_pod_from_spec(
         AKRI_TARGET_NODE_LABEL_NAME.to_string(),
         node_to_run_pod_on.to_string(),
     );
+
+    if is_job {
+        labels.insert(
+            AKRI_IS_JOB_LABEL.to_string(),
+            true.to_string(),
+        );
+    }
 
     let owner_references: Vec<OwnerReference> = vec![OwnerReference {
         api_version: ownership.get_api_version(),
@@ -431,6 +443,7 @@ mod broker_podspec_tests {
                 &node_to_run_pod_on,
                 *capability_is_shared,
                 &pod_spec,
+                false,
             )
             .unwrap();
 
@@ -841,6 +854,7 @@ pub async fn create_pod(
     namespace: &str,
     kube_client: Client,
 ) -> Result<(), anyhow::Error> {
+    // create_job(pod_to_create, namespace, kube_client).await  
     trace!("create_pod enter");
     let pods: Api<Pod> = Api::namespaced(kube_client, namespace);
     info!("create_pod pods.create(...).await?:");
@@ -868,6 +882,60 @@ pub async fn create_pod(
         Err(e) => {
             error!(
                 "create_pod pods.create [{:?}] error: {:?}",
+                serde_json::to_string(&pod_to_create),
+                e
+            );
+            Err(anyhow::anyhow!(e))
+        }
+    }
+}
+
+pub async fn create_job(
+    pod_to_create: &Pod,
+    namespace: &str,
+    kube_client: Client,
+) -> Result<(), anyhow::Error> {
+    trace!("create_job enter");
+    let jobs: Api<Job> = Api::namespaced(kube_client, namespace);
+    let mut spec = pod_to_create.spec.clone().unwrap();
+    spec.restart_policy = Some("Never".to_string());
+    let job_spec = JobSpec {
+        template: PodTemplateSpec {
+            metadata: Some(pod_to_create.metadata.clone()),
+            spec: Some(spec),
+        },
+        ..Default::default()
+    };
+    let job =  Job {
+        spec: Some(job_spec),
+        metadata: pod_to_create.metadata.clone(),
+        ..Default::default()
+    };
+    info!("create_job pods.create(...).await?:");
+    match jobs.create(&PostParams::default(), &job).await {
+        Ok(created_pod) => {
+            info!(
+                "create_job pods.create return: {:?}",
+                created_pod.metadata.name
+            );
+            Ok(())
+        }
+        Err(kube::Error::Api(ae)) => {
+            if ae.code == ERROR_CONFLICT {
+                trace!("create_pod - pod already exists");
+                Ok(())
+            } else {
+                error!(
+                    "create_job pods.create [{:?}] returned kube error: {:?}",
+                    serde_json::to_string(&pod_to_create),
+                    ae
+                );
+                Err(anyhow::anyhow!(ae))
+            }
+        }
+        Err(e) => {
+            error!(
+                "create_job pods.create [{:?}] error: {:?}",
                 serde_json::to_string(&pod_to_create),
                 e
             );
