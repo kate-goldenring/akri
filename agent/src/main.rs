@@ -88,6 +88,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
             .unwrap()
     }));
 
+    tasks.push(tokio::spawn(async move {
+        util::fs_watch::do_fs_watch()
+            .await
+            .unwrap()
+    }));
+
     futures::future::try_join_all(tasks).await?;
     info!("{} Agent end", API_NAMESPACE);
     Ok(())

@@ -1,6 +1,7 @@
 use super::constants::{
     HEALTHY, KUBELET_UPDATE_CHANNEL_CAPACITY, LIST_AND_WATCH_SLEEP_SECS, UNHEALTHY,
 };
+use super::fs_watch::{MANAGEMENT_DIR, STATE_FILE};
 use super::v1beta1;
 use super::v1beta1::{
     device_plugin_server::DevicePlugin, AllocateRequest, AllocateResponse, DevicePluginOptions,
@@ -16,14 +17,19 @@ use akri_shared::{
         AKRI_SLOT_ANNOTATION_NAME,
     },
     k8s,
-    k8s::KubeInterface,
+    k8s::{
+        pod::{AKRI_IS_JOB_LABEL, AKRI_JOB_STATE_FILE_PATH_LABEL},
+        KubeInterface,
+    },
 };
 use log::{error, info, trace};
 #[cfg(test)]
 use mock_instant::Instant;
+use std::path::{Path, PathBuf};
 #[cfg(not(test))]
 use std::time::Instant;
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use tokio::fs;
 use tokio::{
     sync::{broadcast, mpsc, Mutex},
     time::timeout,
@@ -318,11 +324,54 @@ impl DevicePluginService {
             }
             // Successfully reserved device_usage_slot[s] for this node.
             // Add response to list of responses
-            let broker_properties =
+            let mut broker_properties =
                 get_all_broker_properties(&self.config.broker_properties, &self.device.properties);
+
+            // Check if it is a job
+            // TODO: Consider more specifically looking if the values indicate that an update is needed
+            let mut akri_mounts = {
+                if broker_properties.contains_key(AKRI_IS_JOB_LABEL) {
+                    // Create directory for this instance
+                    let subdir = Path::new(MANAGEMENT_DIR).join(&self.instance_name);
+                    #[cfg(not(test))]
+                    fs::create_dir_all(&subdir).await?;
+                    let state_file = subdir
+                        .join(STATE_FILE)
+                        .into_os_string()
+                        .into_string()
+                        .unwrap();
+                    #[cfg(not(test))]
+                    // Create file or truncate existing one
+                    fs::File::create(&state_file).await?;
+                    vec![Mount {
+                        container_path: state_file.clone(),
+                        host_path: state_file,
+                        read_only: false,
+                    }]
+                } else {
+                    Vec::new()
+                }
+            };
+            // TODO: decide when this should be set
+            if broker_properties.contains_key(AKRI_IS_JOB_LABEL)
+                && !broker_properties.contains_key(AKRI_JOB_STATE_FILE_PATH_LABEL)
+            {
+                // Create directory for this instance
+                broker_properties.insert(
+                    AKRI_JOB_STATE_FILE_PATH_LABEL.to_string(),
+                    Path::new(MANAGEMENT_DIR)
+                        .join(&self.instance_name)
+                        .join(super::fs_watch::STATE_FILE)
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                );
+            }
+
             let response = build_container_allocate_response(
                 broker_properties,
                 akri_annotations,
+                &mut akri_mounts,
                 &self.device,
             );
             container_responses.push(response);
@@ -446,10 +495,11 @@ async fn try_update_instance_device_usage(
 fn build_container_allocate_response(
     broker_properties: HashMap<String, String>,
     annotations: HashMap<String, String>,
+    akri_mounts: &mut Vec<Mount>,
     device: &Device,
 ) -> v1beta1::ContainerAllocateResponse {
     // Cast v0 discovery Mount and DeviceSpec types to v1beta1 DevicePlugin types
-    let mounts: Vec<Mount> = device
+    let mut mounts: Vec<Mount> = device
         .mounts
         .clone()
         .into_iter()
@@ -459,6 +509,7 @@ fn build_container_allocate_response(
             read_only: mount.read_only,
         })
         .collect();
+    mounts.append(akri_mounts);
     let device_specs: Vec<DeviceSpec> = device
         .device_specs
         .clone()
@@ -1385,6 +1436,43 @@ mod device_plugin_service_tests {
             .list_and_watch_message_receiver
             .try_recv()
             .is_err());
+    }
+
+    // Test that environment variables set in a Configuration will be set in brokers
+    #[tokio::test]
+    async fn test_internal_allocate_job_mounts() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let (mut device_plugin_service, mut device_plugin_service_receivers) =
+            create_device_plugin_service(InstanceConnectivityStatus::Online, true);
+        let node_name = device_plugin_service.node_name.clone();
+        let instance_name = get_device_instance_name("b494b6", &device_plugin_service.config_name);
+        device_plugin_service
+            .config
+            .broker_properties
+            .insert("akri.sh/is-job".to_string(), "true".to_string());
+        let mut mock = MockKubeInterface::new();
+        let request = setup_internal_allocate_tests(
+            &mut mock,
+            &device_plugin_service,
+            String::new(),
+            node_name,
+        );
+        let mounts = device_plugin_service
+            .internal_allocate(request, Arc::new(mock))
+            .await
+            .unwrap()
+            .into_inner()
+            .container_responses[0]
+            .mounts
+            .clone();
+        assert_eq!(
+            &mounts[0].container_path,
+            Path::new(MANAGEMENT_DIR)
+                .join(&instance_name)
+                .join(STATE_FILE)
+                .to_str()
+                .unwrap()
+        );
     }
 
     // Test when device_usage[id] == ""

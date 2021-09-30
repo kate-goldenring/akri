@@ -31,6 +31,7 @@ k8s-openapi = { version = "0.13.0", default-features = false, features = ["schem
 lazy_static = "1.4"
 log = "0.4"
 mockall_double = "0.2.0"
+notify = "5.0.0-pre.13"
 prometheus = { version = "0.12.0", features = ["process"] }
 prost = "0.8.0"
 prost-types = "0.8.0"

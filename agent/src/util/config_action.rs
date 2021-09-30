@@ -297,7 +297,56 @@ async fn should_recreate_config(
     config: &Configuration,
     config_map: ConfigMap,
 ) -> Result<bool, anyhow::Error> {
+    use k8s::pod::AKRI_JOB_DESIRED_STATE_LABEL;
     let name = config.metadata.name.as_ref().unwrap();
+    // Check if job desired version changed
+    if let Some(config_desired) = config
+        .spec
+        .broker_properties
+        .get(AKRI_JOB_DESIRED_STATE_LABEL)
+    {
+        if let Some(config_info) = config_map
+            .lock()
+            .await
+            .get(config.metadata.name.as_ref().unwrap())
+            .clone()
+        {
+            let kube_interface = k8s::KubeImpl::new().await?;
+            let mut desired_changed = true;
+            for (n, _) in config_info.instance_map.lock().await.clone() {
+                // find instance
+                let mut instance = kube_interface.find_instance(&n, "default").await?;
+                let desired = instance
+                    .spec
+                    .broker_properties
+                    .get(AKRI_JOB_DESIRED_STATE_LABEL)
+                    .ok_or(anyhow::anyhow!(
+                        "Config contains desired state but instance doesn't"
+                    ))?;
+                // check if desired version needs to be updated. if not, break from loop.
+                // TODO: could there be a race case? what if another config change happens and all instances are not updated before checking again?
+                if config_desired == desired {
+                    desired_changed = false;
+                    break;
+                }
+                instance.spec.broker_properties.insert(
+                    AKRI_JOB_DESIRED_STATE_LABEL.to_string(),
+                    config_desired.clone(),
+                );
+                kube_interface
+                    .update_instance(
+                        &instance.spec,
+                        instance.metadata.name.as_ref().unwrap(),
+                        "default",
+                    )
+                    .await?;
+            }
+            if desired_changed {
+                trace!("should_recreate_config - desired state in Configuration {} was modified. Updated all Instances.", config.metadata.name.as_ref().unwrap());
+                return Ok(false);
+            }
+        }
+    }
     let last_generation = config_map
         .lock()
         .await

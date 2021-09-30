@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: version
+spec:
+  template:
+    spec:
+      containers:
+      - name: version
+        image: busybox
+        command: ['sh', '-c', 'echo "v1.1" > $AKRI_JOB_STATE_FILE_PATH && sleep 20']
+        resources:
+          requests:
+            akri.sh/akri-debug-echo-a19705: "1"
+          limits:
+            akri.sh/akri-debug-echo-a19705: "1"
+      restartPolicy: Never

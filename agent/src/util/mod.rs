@@ -5,6 +5,8 @@ mod device_plugin_builder;
 mod device_plugin_service;
 pub mod discovery_operator;
 pub mod embedded_discovery_handlers;
+// TODO: more specific visibility
+pub mod fs_watch;
 pub mod registration;
 pub mod slot_reconciliation;
 pub mod streaming_extension;

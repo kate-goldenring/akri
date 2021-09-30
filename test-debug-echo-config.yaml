@@ -1,0 +1,42 @@
+---
+# Source: akri/templates/debug-echo-configuration.yaml
+apiVersion: akri.sh/v0
+kind: Configuration
+metadata:
+  name: akri-debug-echo
+spec:
+  discoveryHandler: 
+    name: debugEcho
+    discoveryDetails: |+
+      descriptions:
+      - foo0
+      - foo1
+  brokerPodSpec:
+    containers:
+    - name: akri-debug-echo-broker
+      image: busybox
+      command: ['sh', '-c', 'echo "1.2" > $AKRI_JOB_STATE_FILE_PATH']
+      resources:
+        requests:
+          "{{PLACEHOLDER}}" : "1"
+        limits:
+          "{{PLACEHOLDER}}" : "1"
+    restartPolicy: Never
+  instanceServiceSpec:
+    type: ClusterIP
+    ports:
+    - name: akri-debug-echo-foo-instance-service
+      port: 6052
+      protocol: TCP
+      targetPort: 6052
+  configurationServiceSpec:
+    type: ClusterIP
+    ports:
+    - name: akri-debug-echo-foo-configuration-service
+      port: 6052
+      protocol: TCP
+      targetPort: 6052
+  brokerProperties:
+    akri.sh/is-job: "true"
+    akri.sh/job-desired-state: "1.2"
+  capacity: 1

@@ -25,6 +25,7 @@ pub const AKRI_TARGET_NODE_LABEL_NAME: &str = "akri.sh/target-node";
 pub const AKRI_IS_JOB_LABEL: &str = "akri.sh/is-job";
 pub const AKRI_JOB_DESIRED_STATE_LABEL: &str = "akri.sh/job-desired-state";
 pub const AKRI_JOB_ACTUAL_STATE_LABEL: &str = "akri.sh/job-actual-state";
+pub const AKRI_JOB_STATE_FILE_PATH_LABEL: &str = "AKRI_JOB_STATE_FILE_PATH";
 
 /// Get Kubernetes Pods with a given label or field selector
 ///
