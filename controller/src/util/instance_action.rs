@@ -402,23 +402,46 @@ async fn handle_addition_work(
 }
 
 /// Checks if job should be run on nodes by comparing desired state to actual state.
-fn run_jobs_check(instance: &Instance) -> anyhow::Result<bool> {
+fn should_run_jobs(instance: &Instance) -> anyhow::Result<bool> {
+    info!("should_run_jobs - enter");
     // Desired state should always be specified
     let desired_state = instance.spec.broker_properties.get(AKRI_JOB_DESIRED_STATE_LABEL).ok_or_else(|| anyhow::anyhow!("Instance with Job brokers does not have desired state in properties"))?;
     // Actual state should be set after first completion. Assume job has not run yet if not set and return true
     match instance.spec.broker_properties.get(AKRI_JOB_ACTUAL_STATE_LABEL) {
-        Some(actual_state) => Ok(do_state_comparison(desired_state, actual_state).unwrap_or(true)),
-        None => Ok(true)
+        Some(actual_state) => Ok(!at_desired_state(desired_state, actual_state)?),
+        None => {
+            info!("should_run_jobs - No actual state");
+            Ok(true)
+        }
     }
     
 }
 
 /// Ideally (TODO): Compares the job states using the method indicated in a Configuration
-/// For now, returns false so long as actual state is an empty string which the controller sets after Job completion
+/// For now, assumes numeric only semver version and returns true so long as actual_state >= desired_state
 /// v2, assumes integer state values and returns true so long as actual == desired
-fn do_state_comparison(desired_state: &str, actual_state: &str) -> anyhow::Result<bool> {
-    Ok(!actual_state.is_empty())
-    // Ok(actual_state.parse::<i32>()? == desired_state.parse::<i32>()?)
+fn at_desired_state(desired_state: &str, actual_state: &str) -> anyhow::Result<bool> {
+    info!("at_desired_state - enter");
+    let desired_comps: Vec<&str> = desired_state.split('.').collect();
+    let actual_comps: Vec<&str> = actual_state.split('.').collect();
+    if desired_comps.len() > 3 || actual_comps.len() > 3 {
+        anyhow::anyhow!("Desired or actual version should not have more than 3 version parts (mj.mn.patch)");
+    }
+    for v in 0..desired_comps.len() {
+        if v > actual_comps.len() - 1 {
+            if desired_comps[v].parse::<i32>()? != 0 {
+                // Allow ONLY for trailing 0 minor and patch versions
+                info!("at_desired_state - false");
+                return Ok(false);
+            }
+        } else if actual_comps[v].parse::<i32>()? < desired_comps[v].parse::<i32>()? {
+            info!("FALSE {} < {} ", actual_comps[v], desired_comps[v]);
+            info!("at_desired_state - false");
+            return Ok(false);
+        } 
+    }
+    info!("at_desired_state - true");
+    Ok(true)
 }
 
 /// Handle Instance change by watching for node
@@ -429,7 +452,7 @@ pub async fn handle_instance_change(
     action: &InstanceAction,
     kube_interface: &impl KubeInterface,
 ) -> anyhow::Result<()> {
-    trace!("handle_instance_change - enter {:?}", action);
+    info!("handle_instance_change - enter {:?}", action);
 
     let instance_name = instance.metadata.name.clone().unwrap();
     let instance_namespace =
@@ -450,7 +473,8 @@ pub async fn handle_instance_change(
     };
     // Check if the Instance has Job brokers and they have achieved the correct state.
     // This means that new brokers should not be deployed and should return early.
-    if instance.spec.broker_properties.contains_key(AKRI_IS_JOB_LABEL) && !run_jobs_check(instance)? {
+    info!("handle_instance - BEFORE CHECK");
+    if instance.spec.broker_properties.contains_key(AKRI_IS_JOB_LABEL) && !should_run_jobs(instance)? {
         default_action = PodAction::NoAction;
     }
 
@@ -833,6 +857,19 @@ mod handle_instance_tests {
         .await
         .unwrap();
         trace!("run_handle_instance_change_test exit");
+    }
+
+    #[test]
+    fn test_at_desired_state() {
+        assert!(!at_desired_state("1.1.2", "1.2.0").unwrap());
+        assert!(!at_desired_state("1.1.2", "1.1.0").unwrap());
+        assert!(!at_desired_state("1.1.2", "1.1").unwrap());
+        assert!(at_desired_state("1.1", "1.1.2").unwrap());
+        assert!(at_desired_state("1.1", "1.1").unwrap());
+        assert!(at_desired_state("1", "1").unwrap());
+        assert!(at_desired_state("1.0", "1").unwrap());
+        assert!(at_desired_state("1.0", "1.0.0").unwrap());
+        assert!(!at_desired_state("1.0.1", "1").unwrap());
     }
 
     // Test that watcher errors on restarts unless it is the first restart (aka initial startup)
