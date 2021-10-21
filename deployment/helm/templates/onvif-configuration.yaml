@@ -57,6 +57,7 @@ spec:
           {{`"{{PLACEHOLDER}}"`}} : "1"
           memory: {{ .Values.onvif.configuration.brokerPod.resources.memoryLimit }}
           cpu: {{ .Values.onvif.configuration.brokerPod.resources.cpuLimit }}
+    restartPolicy: {{ .Values.onvif.configuration.brokerPod.restartPolicy }}
     {{- with .Values.imagePullSecrets }}
     imagePullSecrets:
       {{- toYaml . | nindent 6 }}

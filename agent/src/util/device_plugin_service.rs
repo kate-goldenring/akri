@@ -324,8 +324,14 @@ impl DevicePluginService {
             }
             // Successfully reserved device_usage_slot[s] for this node.
             // Add response to list of responses
-            let mut broker_properties =
-                get_all_broker_properties(&self.config.broker_properties, &self.device.properties);
+            // TODO: rearchitect DPS so that config properties in the struct can be modified upon config changes
+            let mut broker_properties = get_all_broker_properties_latest(
+                kube_interface.clone(),
+                &self.config_name,
+                &self.config_namespace,
+                &self.device.properties,
+            )
+            .await?;
 
             // Check if it is a job
             // TODO: Consider more specifically looking if the values indicate that an update is needed
@@ -343,6 +349,12 @@ impl DevicePluginService {
                     #[cfg(not(test))]
                     // Create file or truncate existing one
                     fs::File::create(&state_file).await?;
+                    info!("Inserting env var {}", AKRI_JOB_STATE_FILE_PATH_LABEL);
+
+                    broker_properties.insert(
+                        AKRI_JOB_STATE_FILE_PATH_LABEL.to_string(),
+                        state_file.clone(),
+                    );
                     vec![Mount {
                         container_path: state_file.clone(),
                         host_path: state_file,
@@ -352,21 +364,6 @@ impl DevicePluginService {
                     Vec::new()
                 }
             };
-            // TODO: decide when this should be set
-            if broker_properties.contains_key(AKRI_IS_JOB_LABEL)
-                && !broker_properties.contains_key(AKRI_JOB_STATE_FILE_PATH_LABEL)
-            {
-                // Create directory for this instance
-                broker_properties.insert(
-                    AKRI_JOB_STATE_FILE_PATH_LABEL.to_string(),
-                    Path::new(MANAGEMENT_DIR)
-                        .join(&self.instance_name)
-                        .join(super::fs_watch::STATE_FILE)
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                );
-            }
 
             let response = build_container_allocate_response(
                 broker_properties,
@@ -799,6 +796,31 @@ pub fn get_device_instance_name(id: &str, config_name: &str) -> String {
     format!("{}-{}", config_name, &id)
         .replace(".", "-")
         .replace("/", "-")
+}
+
+// Gets latest broker properties from the Configuration and concatenates them with device properties
+async fn get_all_broker_properties_latest(
+    kube_interface: Arc<impl KubeInterface>,
+    config_name: &str,
+    config_namespace: &str,
+    device_properties: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, Status> {
+    match kube_interface
+        .find_configuration(config_name, config_namespace)
+        .await
+    {
+        Ok(c) => Ok(c
+            .spec
+            .broker_properties
+            .clone()
+            .into_iter()
+            .chain(device_properties.clone())
+            .collect::<HashMap<String, String>>()),
+        Err(_) => Err(Status::new(
+            Code::Unknown,
+            format!("Could not find Configuration {}", config_name),
+        )),
+    }
 }
 
 // Aggregate a Configuration and Device's properties so they can be displayed in an Instance and injected into brokers as environment variables.

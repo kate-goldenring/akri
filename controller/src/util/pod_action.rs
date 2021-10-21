@@ -249,7 +249,7 @@ impl PodActionInfo {
                     // For pods that are Pending (with our controller's selector) ...
                     //
                     self.choice_for_non_running_pods(self.pending_grace_time_in_minutes)
-                } else { 
+                } else {
                     if self.is_job && self.phase.as_str() == "Succeeded" {
                         Ok(PodAction::Remove)
                     } else {

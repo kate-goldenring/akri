@@ -6,7 +6,8 @@ use akri_shared::{
     k8s,
     k8s::{
         pod::{
-            AKRI_CONFIGURATION_LABEL_NAME, AKRI_IS_JOB_LABEL, AKRI_JOB_ACTUAL_STATE_LABEL, AKRI_INSTANCE_LABEL_NAME, AKRI_TARGET_NODE_LABEL_NAME,
+            AKRI_CONFIGURATION_LABEL_NAME, AKRI_INSTANCE_LABEL_NAME, AKRI_IS_JOB_LABEL,
+            AKRI_JOB_ACTUAL_STATE_LABEL, AKRI_TARGET_NODE_LABEL_NAME,
         },
         service, KubeInterface, OwnershipInfo, OwnershipType,
     },

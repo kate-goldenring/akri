@@ -105,21 +105,36 @@ async fn update_instance_state(
         .await?;
     println!("HERE");
     // TODO: Do check that is SemVer here
-    let old_state = instance.spec.broker_properties.insert(
+    match instance.spec.broker_properties.insert(
         AKRI_JOB_ACTUAL_STATE_LABEL.to_string(),
         new_state.to_string(),
-    );
-    trace!(
-        "update_instance_state - {} property updated from {:?} to {}",
-        AKRI_JOB_ACTUAL_STATE_LABEL,
-        old_state,
-        new_state
-    );
-    // TODO: do retries
-    kube_interface
-        .update_instance(&instance.spec, instance_name, instance_namespace)
-        .await?;
-
+    ) {
+        Some(old_state) => {
+            if old_state != new_state {
+                trace!(
+                    "update_instance_state - {} property updated from {} to {}",
+                    AKRI_JOB_ACTUAL_STATE_LABEL,
+                    old_state,
+                    new_state
+                );
+                // TODO: do retries
+                kube_interface
+                    .update_instance(&instance.spec, instance_name, instance_namespace)
+                    .await?;
+            }
+            trace!("update_instance_state - state at expected {}", new_state);
+        }
+        None => {
+            kube_interface
+                .update_instance(&instance.spec, instance_name, instance_namespace)
+                .await?;
+            trace!(
+                "update_instance_state - {} property updated to {}",
+                AKRI_JOB_ACTUAL_STATE_LABEL,
+                new_state
+            );
+        }
+    }
     Ok(())
 }
 // If event is create or modify

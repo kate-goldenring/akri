@@ -5,7 +5,10 @@ use akri_shared::{
     k8s,
     k8s::{
         pod,
-        pod::{AKRI_INSTANCE_LABEL_NAME, AKRI_IS_JOB_LABEL, AKRI_JOB_DESIRED_STATE_LABEL, AKRI_JOB_ACTUAL_STATE_LABEL, AKRI_TARGET_NODE_LABEL_NAME},
+        pod::{
+            AKRI_INSTANCE_LABEL_NAME, AKRI_IS_JOB_LABEL, AKRI_JOB_ACTUAL_STATE_LABEL,
+            AKRI_JOB_DESIRED_STATE_LABEL, AKRI_TARGET_NODE_LABEL_NAME,
+        },
         KubeInterface, OwnershipInfo, OwnershipType,
     },
 };
@@ -369,7 +372,10 @@ async fn handle_addition_work(
         // TODO: Check if the job has succeeded
         // TODO make this a useful broker property that is being searched for based on some
         // new Configuration field like JobStatusProperty
-        let is_job = instance_configuration.spec.broker_properties.contains_key(AKRI_IS_JOB_LABEL);
+        let is_job = instance_configuration
+            .spec
+            .broker_properties
+            .contains_key(AKRI_IS_JOB_LABEL);
         let capability_id = format!("{}/{}", AKRI_PREFIX, instance_name);
         let new_pod = pod::create_new_pod_from_spec(
             instance_namespace,
@@ -405,27 +411,41 @@ async fn handle_addition_work(
 fn should_run_jobs(instance: &Instance) -> anyhow::Result<bool> {
     info!("should_run_jobs - enter");
     // Desired state should always be specified
-    let desired_state = instance.spec.broker_properties.get(AKRI_JOB_DESIRED_STATE_LABEL).ok_or_else(|| anyhow::anyhow!("Instance with Job brokers does not have desired state in properties"))?;
+    let desired_state = instance
+        .spec
+        .broker_properties
+        .get(AKRI_JOB_DESIRED_STATE_LABEL)
+        .ok_or_else(|| {
+            anyhow::anyhow!("Instance with Job brokers does not have desired state in properties")
+        })?;
     // Actual state should be set after first completion. Assume job has not run yet if not set and return true
-    match instance.spec.broker_properties.get(AKRI_JOB_ACTUAL_STATE_LABEL) {
+    match instance
+        .spec
+        .broker_properties
+        .get(AKRI_JOB_ACTUAL_STATE_LABEL)
+    {
         Some(actual_state) => Ok(!at_desired_state(desired_state, actual_state)?),
         None => {
             info!("should_run_jobs - No actual state");
             Ok(true)
         }
     }
-    
 }
 
 /// Ideally (TODO): Compares the job states using the method indicated in a Configuration
 /// For now, assumes numeric only semver version and returns true so long as actual_state >= desired_state
 /// v2, assumes integer state values and returns true so long as actual == desired
 fn at_desired_state(desired_state: &str, actual_state: &str) -> anyhow::Result<bool> {
-    info!("at_desired_state - enter");
+    info!(
+        "at_desired_state - enter with desired state {} and actual state {}",
+        desired_state, actual_state
+    );
     let desired_comps: Vec<&str> = desired_state.split('.').collect();
     let actual_comps: Vec<&str> = actual_state.split('.').collect();
     if desired_comps.len() > 3 || actual_comps.len() > 3 {
-        anyhow::anyhow!("Desired or actual version should not have more than 3 version parts (mj.mn.patch)");
+        anyhow::anyhow!(
+            "Desired or actual version should not have more than 3 version parts (mj.mn.patch)"
+        );
     }
     for v in 0..desired_comps.len() {
         if v > actual_comps.len() - 1 {
@@ -435,10 +455,13 @@ fn at_desired_state(desired_state: &str, actual_state: &str) -> anyhow::Result<b
                 return Ok(false);
             }
         } else if actual_comps[v].parse::<i32>()? < desired_comps[v].parse::<i32>()? {
-            info!("FALSE {} < {} ", actual_comps[v], desired_comps[v]);
             info!("at_desired_state - false");
             return Ok(false);
-        } 
+        } else if actual_comps[v].parse::<i32>()? > desired_comps[v].parse::<i32>()? {
+            info!("at_desired_state - true");
+            return Ok(true);
+        }
+        // Only continue if component is the same version
     }
     info!("at_desired_state - true");
     Ok(true)
@@ -474,7 +497,12 @@ pub async fn handle_instance_change(
     // Check if the Instance has Job brokers and they have achieved the correct state.
     // This means that new brokers should not be deployed and should return early.
     info!("handle_instance - BEFORE CHECK");
-    if instance.spec.broker_properties.contains_key(AKRI_IS_JOB_LABEL) && !should_run_jobs(instance)? {
+    if instance
+        .spec
+        .broker_properties
+        .contains_key(AKRI_IS_JOB_LABEL)
+        && !should_run_jobs(instance)?
+    {
         default_action = PodAction::NoAction;
     }
 
@@ -861,7 +889,8 @@ mod handle_instance_tests {
 
     #[test]
     fn test_at_desired_state() {
-        assert!(!at_desired_state("1.1.2", "1.2.0").unwrap());
+        let _ = env_logger::builder().is_test(true).try_init();
+        assert!(at_desired_state("1.1.2", "1.2.0").unwrap());
         assert!(!at_desired_state("1.1.2", "1.1.0").unwrap());
         assert!(!at_desired_state("1.1.2", "1.1").unwrap());
         assert!(at_desired_state("1.1", "1.1.2").unwrap());

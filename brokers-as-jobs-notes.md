@@ -22,3 +22,6 @@ METRICS_PORT=8082 RUST_LOG=info KUBECONFIG=/etc/rancher/k3s/k3s.yaml  ./target/d
 sudo DEBUG_ECHO_INSTANCES_SHARED=true ENABLE_DEBUG_ECHO=1 RUST_LOG=info  KUBECONFIG=/etc/rancher/k3s/k3s.yaml DISCOVERY_HANDLERS_DIRECTORY=/home/kagold/tmp/akri AGENT_NODE_NAME=akri-dev HOST_CRICTL_PATH=/usr/local/bin/crictl HOST_RUNTIME_ENDPOINT=/run/k3s/containerd/containerd.sock HOST_IMAGE_ENDPOINT=/run/k3s/containerd/containerd.sock ./target/debug/agent
 kubectl apply -f akri/test-debug-echo-config.yaml
 ```
+
+Current 10/19/2021
+handle deleting directory after instance deleted (ie /var/lib/akri/management/akri-onvif-97e1d1/state.txt)

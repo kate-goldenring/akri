@@ -3,11 +3,11 @@ use super::{
     NODE_SELECTOR_OP_IN, OBJECT_NAME_FIELD, RESOURCE_REQUIREMENTS_KEY,
 };
 use either::Either;
-use k8s_openapi::api::core::v1::{
-    Affinity, NodeAffinity, NodeSelector, NodeSelectorRequirement, NodeSelectorTerm, Pod, PodSpec, PodTemplateSpec,
-    ResourceRequirements,
-};
 use k8s_openapi::api::batch::v1::{Job, JobSpec};
+use k8s_openapi::api::core::v1::{
+    Affinity, NodeAffinity, NodeSelector, NodeSelectorRequirement, NodeSelectorTerm, Pod, PodSpec,
+    PodTemplateSpec, ResourceRequirements,
+};
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::{
@@ -23,7 +23,7 @@ pub const AKRI_CONFIGURATION_LABEL_NAME: &str = "akri.sh/configuration";
 pub const AKRI_INSTANCE_LABEL_NAME: &str = "akri.sh/instance";
 pub const AKRI_TARGET_NODE_LABEL_NAME: &str = "akri.sh/target-node";
 pub const AKRI_IS_JOB_LABEL: &str = "akri.sh/is-job";
-pub const AKRI_JOB_DESIRED_STATE_LABEL: &str = "akri.sh/job-desired-state";
+pub const AKRI_JOB_DESIRED_STATE_LABEL: &str = "JOB_DESIRED_STATE";
 pub const AKRI_JOB_ACTUAL_STATE_LABEL: &str = "akri.sh/job-actual-state";
 pub const AKRI_JOB_STATE_FILE_PATH_LABEL: &str = "AKRI_JOB_STATE_FILE_PATH";
 
@@ -187,10 +187,7 @@ pub fn create_new_pod_from_spec(
     );
 
     if is_job {
-        labels.insert(
-            AKRI_IS_JOB_LABEL.to_string(),
-            true.to_string(),
-        );
+        labels.insert(AKRI_IS_JOB_LABEL.to_string(), true.to_string());
     }
 
     let owner_references: Vec<OwnerReference> = vec![OwnerReference {
@@ -855,7 +852,7 @@ pub async fn create_pod(
     namespace: &str,
     kube_client: Client,
 ) -> Result<(), anyhow::Error> {
-    // create_job(pod_to_create, namespace, kube_client).await  
+    // create_job(pod_to_create, namespace, kube_client).await
     trace!("create_pod enter");
     let pods: Api<Pod> = Api::namespaced(kube_client, namespace);
     info!("create_pod pods.create(...).await?:");
@@ -907,7 +904,7 @@ pub async fn create_job(
         },
         ..Default::default()
     };
-    let job =  Job {
+    let job = Job {
         spec: Some(job_spec),
         metadata: pod_to_create.metadata.clone(),
         ..Default::default()
