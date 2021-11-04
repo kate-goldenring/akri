@@ -1,0 +1,19 @@
+controller:
+  image: 
+    repository: ghcr.io/kate-goldenring/controller
+    tag: v0.6.16-20211101_150604-amd64
+agent:
+  image:
+    repository: ghcr.io/kate-goldenring/agent
+    tag: v0.6.16-20211101_154519-amd64
+imagePullSecrets:
+- name: kate-regcred
+# onvif: 
+#   discovery: 
+#     enabled: true
+#   configuration: 
+#     enabled: true
+#     brokerPod:
+#       image:
+#         repository: ghcr.io/project-akri/akri/onvif-video-broker
+#         tag: latest

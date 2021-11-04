@@ -37,6 +37,6 @@ spec:
       protocol: TCP
       targetPort: 6052
   brokerProperties:
-    akri.sh/is-job: "true"
+    IS_JOB: "true"
     JOB_DESIRED_STATE: "1.6"
   capacity: 1

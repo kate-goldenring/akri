@@ -1,0 +1,23 @@
+controller:
+  enabled: false
+agent:
+  enabled: false
+rbac:
+  enabled: false
+imagePullSecrets:
+- name: kate-regcred
+onvif: 
+  configuration: 
+    enabled: true
+    name: akri-onvif-update
+    brokerPod:
+      image:
+        repository: ghcr.io/kate-goldenring/onvif-update-broker
+        tag: latest
+    restartPolicy: Never
+    brokerProperties:
+      IS_JOB:
+        "true"
+      # JOB_DESIRED_STATE:
+      #   "2.0"
+    capacity: "2"

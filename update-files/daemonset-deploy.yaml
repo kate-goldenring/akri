@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: onvif-broker-daemonset
+  namespace: default
+  ownerReferences:
+  - apiVersion: akri.sh/v0
+    blockOwnerDeletion: true
+    controller: true
+    kind: Configuration
+    name: akri-onvif
+    uid: 1acf639c-5096-438d-a66c-d77849897c12
+  # labels:
+  #   k8s-app: fluentd-logging
+spec:
+  selector:
+    matchLabels:
+      name: onvif-broker
+  template:
+    metadata:
+      labels:
+        akri.sh/configuration: akri-onvif
+        akri.sh/instance: akri-onvif-853d1c
+        # akri.sh/target-node: britel-xubuntu
+        controller: akri.sh
+        name: onvif-broker
+    spec:
+      tolerations:
+      # this toleration is to have the daemonset runnable on master nodes
+      # remove it if your masters can't run pods
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - image: ghcr.io/project-akri/akri/onvif-video-broker:latest
+        imagePullPolicy: Always
+        name: onvif-broker
+        resources:
+          limits:
+            akri.sh/akri-onvif-853d1c: "1"
+            cpu: 2800m
+            memory: 400Mi
+          requests:
+            akri.sh/akri-onvif-853d1c: "1"
+            cpu: 134m
+            memory: 98Mi
+      terminationGracePeriodSeconds: 30

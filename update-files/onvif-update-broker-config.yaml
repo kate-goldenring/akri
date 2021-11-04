@@ -1,0 +1,53 @@
+# Source: akri/templates/onvif-configuration.yaml
+apiVersion: akri.sh/v0
+kind: Configuration
+metadata:
+  name: akri-onvif-update
+spec:
+  discoveryHandler:
+    name: onvif
+    discoveryDetails: |+
+      ipAddresses: 
+        action: Exclude
+        items: []
+      macAddresses:
+        action: Exclude
+        items: []
+      scopes:
+        action: Exclude
+        items: []
+      discoveryTimeoutSeconds: 1
+  brokerPodSpec:
+    containers:
+    - name: akri-onvif-update-broker
+      image: "ghcr.io/kate-goldenring/onvif-update-broker:latest"
+      resources:
+        requests:
+          "{{PLACEHOLDER}}" : "1"
+          memory: 98Mi
+          cpu: 134m
+        limits:
+          "{{PLACEHOLDER}}" : "1"
+          memory: 400Mi
+          cpu: 2800m
+    restartPolicy: Never
+    imagePullSecrets:
+      - name: kate-regcred
+  instanceServiceSpec:
+    type: ClusterIP
+    ports:
+    - name: grpc
+      port: 80
+      protocol: TCP
+      targetPort: 6052
+  configurationServiceSpec:
+    type: ClusterIP
+    ports:
+    - name: grpc
+      port: 80
+      protocol: TCP
+      targetPort: 6052
+  brokerProperties:
+    JOB_DESIRED_STATE: "4.3"
+    IS_JOB: "true"
+  capacity: 1

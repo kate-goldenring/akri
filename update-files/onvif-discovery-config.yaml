@@ -19,8 +19,8 @@ spec:
       discoveryTimeoutSeconds: 1
   brokerPodSpec:
     containers:
-    - name: akri-onvif-broker
-      image: "ghcr.io/kate-goldenring/onvif-update-broker:latest"
+    - name: akri-onvif-frame-broker
+      image: "ghcr.io/project-akri/akri/onvif-video-broker:latest"
       resources:
         requests:
           "{{PLACEHOLDER}}" : "1"
@@ -30,24 +30,20 @@ spec:
           "{{PLACEHOLDER}}" : "1"
           memory: 400Mi
           cpu: 2800m
-    restartPolicy: Never
-    imagePullSecrets:
-      - name: kate-regcred
+    restartPolicy: Always
   instanceServiceSpec:
     type: ClusterIP
     ports:
     - name: grpc
       port: 80
       protocol: TCP
-      targetPort: 6052
+      targetPort: 8083
   configurationServiceSpec:
     type: ClusterIP
     ports:
     - name: grpc
       port: 80
       protocol: TCP
-      targetPort: 6052
-  brokerProperties:
-    JOB_DESIRED_STATE: "4.3"
-    akri.sh/is-job: "true"
+      targetPort: 8083
+  brokerProperties: {}
   capacity: 1

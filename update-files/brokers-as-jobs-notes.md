@@ -18,10 +18,15 @@ Is there a reason to deploy as a Job instead of as a Pod with restart-policy=0? 
 Current 9/27/2021
 After broker ends, controller sees pod event and calls handle_instance_change which will not deploy brokers if IS_JOB & !should_run_jobs.
 ```
+cargo build -p agent --features "agent-full onvif-feat"
 METRICS_PORT=8082 RUST_LOG=info KUBECONFIG=/etc/rancher/k3s/k3s.yaml  ./target/debug/controller
-sudo DEBUG_ECHO_INSTANCES_SHARED=true ENABLE_DEBUG_ECHO=1 RUST_LOG=info  KUBECONFIG=/etc/rancher/k3s/k3s.yaml DISCOVERY_HANDLERS_DIRECTORY=/home/kagold/tmp/akri AGENT_NODE_NAME=akri-dev HOST_CRICTL_PATH=/usr/local/bin/crictl HOST_RUNTIME_ENDPOINT=/run/k3s/containerd/containerd.sock HOST_IMAGE_ENDPOINT=/run/k3s/containerd/containerd.sock ./target/debug/agent
+sudo DEBUG_ECHO_INSTANCES_SHARED=true ENABLE_DEBUG_ECHO=1 RUST_LOG=info  KUBECONFIG=/etc/rancher/k3s/k3s.yaml DISCOVERY_HANDLERS_DIRECTORY=/home/kagold/tmp/akri AGENT_NODE_NAME=britel-xubuntu HOST_CRICTL_PATH=/usr/local/bin/crictl HOST_RUNTIME_ENDPOINT=/run/k3s/containerd/containerd.sock HOST_IMAGE_ENDPOINT=/run/k3s/containerd/containerd.sock ./target/debug/agent
 kubectl apply -f akri/test-debug-echo-config.yaml
 ```
 
 Current 10/19/2021
 handle deleting directory after instance deleted (ie /var/lib/akri/management/akri-onvif-97e1d1/state.txt)
+
+11/1/2021
+handle multiple configurations per instance so can apply on application configuration and then another update configuration
+should the updater not return until sleep over or should return and then sleep? probably the latter

@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: onvif-update-broker
+spec:
+  template:
+    spec:
+      containers:
+      - image: "ghcr.io/kate-goldenring/onvif-update-broker:latest"
+        imagePullPolicy: Always
+        name: onvif-update-broker
+        resources:
+          limits:
+            akri.sh/akri-onvif-853d1c: "1"
+          requests:
+            akri.sh/akri-onvif-853d1c: "1"
+        env:
+        - name: JOB_DESIRED_STATE
+          value: "7.0"
+        - name: AKRI_JOB_STATE_FILE_PATH
+          value: "/management/akri-onvif-853d1c/state.txt"
+        volumeMounts:
+        - mountPath: /management/akri-onvif-853d1c/state.txt
+          name: update-dir
+      restartPolicy: Never
+      imagePullSecrets:
+      - name: kate-regcred
+      volumes:
+      - name: update-dir
+        # This AWS EBS volume must already exist.
+        hostPath:
+          path: "/var/lib/akri/management/akri-onvif-853d1c/state.txt"
+  backoffLimit: 4
