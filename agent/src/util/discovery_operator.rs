@@ -672,25 +672,26 @@ pub mod start_discovery {
                     endpoint
                 );
                 // Only use DiscoveryHandler if it doesn't have a client yet
-                if dh_details.connectivity_status != DiscoveryHandlerStatus::Active {
-                    trace!(
-                        "do_discover - {} discovery handler at endpoint {:?} doesn't have client",
-                        config.spec.discovery_handler.name,
-                        endpoint
-                    );
-                    let discovery_operator = discovery_operator.clone();
-                    let kube_interface = kube_interface.clone();
-                    discovery_tasks.push(tokio::spawn(async move {
-                        do_discover_on_discovery_handler(
-                            discovery_operator.clone(),
-                            kube_interface.clone(),
-                            &endpoint,
-                            &dh_details,
-                        )
-                        .await
-                        .unwrap();
-                    }));
-                }
+                // TODO: This disallows creating multiple connections with the same DH
+                // if dh_details.connectivity_status != DiscoveryHandlerStatus::Active {
+                trace!(
+                    "do_discover - {} discovery handler at endpoint {:?} doesn't have client",
+                    config.spec.discovery_handler.name,
+                    endpoint
+                );
+                let discovery_operator = discovery_operator.clone();
+                let kube_interface = kube_interface.clone();
+                discovery_tasks.push(tokio::spawn(async move {
+                    do_discover_on_discovery_handler(
+                        discovery_operator.clone(),
+                        kube_interface.clone(),
+                        &endpoint,
+                        &dh_details,
+                    )
+                    .await
+                    .unwrap();
+                }));
+                // }
             }
         }
         futures::future::try_join_all(discovery_tasks).await?;

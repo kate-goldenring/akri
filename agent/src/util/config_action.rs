@@ -10,6 +10,7 @@ use super::{
 };
 use akri_shared::{
     akri::configuration::Configuration,
+    akri::configuration::DiscoveryHandlerInfo,
     k8s,
     k8s::{try_delete_instance, KubeInterface},
 };
@@ -39,6 +40,7 @@ pub struct ConfigInfo {
     /// This is used to determine if the `Configuration` actually changed, or if only the metadata changed.
     /// The `.metadata.generation` value is incremented for all changes, except for changes to `.metadata` or `.status`.
     last_generation: Option<i64>,
+    last_dh_info: DiscoveryHandlerInfo,
 }
 
 /// This handles pre-existing Configurations and invokes an internal method that watches for Configuration events.
@@ -210,6 +212,7 @@ async fn handle_config_add(
         stop_discovery_sender: stop_discovery_sender.clone(),
         finished_discovery_receiver,
         last_generation: config.metadata.generation,
+        last_dh_info: config.spec.discovery_handler.clone(),
     };
     config_map
         .lock()
@@ -311,6 +314,10 @@ async fn should_recreate_config(
             .get(config.metadata.name.as_ref().unwrap())
             .clone()
         {
+            // If DH changed, delete and re-add config
+            if config_info.last_dh_info != config.spec.discovery_handler {
+                return Ok(true);
+            }
             let kube_interface = k8s::KubeImpl::new().await?;
             let mut desired_changed = true;
             for (n, _) in config_info.instance_map.lock().await.clone() {
@@ -341,6 +348,7 @@ async fn should_recreate_config(
                     )
                     .await?;
             }
+            // TODO: this assumes nothing else was changed in the config
             if desired_changed {
                 trace!("should_recreate_config - desired state in Configuration {} was modified. Updated all Instances.", config.metadata.name.as_ref().unwrap());
                 return Ok(false);
@@ -458,6 +466,7 @@ mod config_action_tests {
                 instance_map: instance_map.clone(),
                 finished_discovery_receiver,
                 last_generation: config.metadata.generation,
+                last_dh_info: config.spec.discovery_handler,
             },
         );
         let config_map: ConfigMap = Arc::new(Mutex::new(map));
@@ -724,6 +733,10 @@ mod config_action_tests {
             stop_discovery_sender: stop_discovery_sender.clone(),
             finished_discovery_receiver,
             last_generation: Some(1),
+            last_dh_info: DiscoveryHandlerInfo {
+                name: "dh_name".to_string(),
+                discovery_details: "dh_details".to_string(),
+            },
         };
         let config_name = config.metadata.name.clone().unwrap();
         let config_map: ConfigMap = Arc::new(Mutex::new(HashMap::new()));

@@ -19,7 +19,7 @@ pub type ConfigurationList = ObjectList<Configuration>;
 
 /// This specifies which `DiscoveryHandler` should be used for discovery
 /// and any details that need to be sent to the `DiscoveryHandler`.
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoveryHandlerInfo {
     pub name: String,

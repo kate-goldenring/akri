@@ -1464,14 +1464,14 @@ mod device_plugin_service_tests {
     #[tokio::test]
     async fn test_internal_allocate_job_mounts() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let (mut device_plugin_service, mut device_plugin_service_receivers) =
+        let (mut device_plugin_service, device_plugin_service_receivers) =
             create_device_plugin_service(InstanceConnectivityStatus::Online, true);
         let node_name = device_plugin_service.node_name.clone();
         let instance_name = get_device_instance_name("b494b6", &device_plugin_service.config_name);
         device_plugin_service
             .config
             .broker_properties
-            .insert("akri.sh/is-job".to_string(), "true".to_string());
+            .insert("IS_JOB".to_string(), "true".to_string());
         let mut mock = MockKubeInterface::new();
         let request = setup_internal_allocate_tests(
             &mut mock,
