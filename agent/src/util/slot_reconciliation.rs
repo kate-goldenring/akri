@@ -1,17 +1,21 @@
 use super::{constants::SLOT_RECONCILIATION_CHECK_DELAY_SECS, crictl_containers};
-use akri_shared::{akri::instance::InstanceSpec, k8s::KubeInterface};
+use akri_shared::{
+    akri::instance::InstanceSpec,
+    k8s::{self, KubeInterface},
+};
 use async_trait::async_trait;
 use k8s_openapi::api::core::v1::PodStatus;
 #[cfg(test)]
 use mockall::{automock, predicate::*};
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
 };
 use tokio::process::Command;
 
-type SlotQueryResult = Result<HashSet<String>, Box<dyn std::error::Error + Send + Sync + 'static>>;
+type SlotQueryResult =
+    Result<HashMap<String, String>, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 #[cfg_attr(test, automock)]
 #[async_trait]
@@ -48,7 +52,9 @@ impl SlotQuery for CriCtlSlotQuery {
                 if output.status.success() {
                     trace!("get_node_slots - crictl called successfully");
                     let output_string = String::from_utf8_lossy(&output.stdout);
-                    Ok(crictl_containers::get_container_slot_usage(&output_string))
+                    let slots = crictl_containers::get_container_slot_usage(&output_string);
+                    info!("get_node_slots - slots are {:?}", slots);
+                    Ok(slots)
                 } else {
                     let output_string = String::from_utf8_lossy(&output.stderr);
                     Err(None.ok_or(format!(
@@ -68,6 +74,7 @@ impl SlotQuery for CriCtlSlotQuery {
 /// Makes sure Instance's `device_usage` accurately reflects actual usage.
 pub struct DevicePluginSlotReconciler {
     pub removal_slot_map: Arc<Mutex<HashMap<String, Instant>>>,
+    pub slot_pod_map: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl DevicePluginSlotReconciler {
@@ -100,10 +107,54 @@ impl DevicePluginSlotReconciler {
         );
 
         // Any slot found in use should be scrubbed from our list
-        node_slot_usage.iter().for_each(|slot| {
+        for (slot, pod_name) in node_slot_usage.clone() {
             trace!("reconcile - remove slot from tracked slots: {:?}", slot);
-            self.removal_slot_map.lock().unwrap().remove(slot);
-        });
+            self.removal_slot_map.lock().unwrap().remove(&slot);
+            if !self.slot_pod_map.read().unwrap().contains_key(&slot) {
+                let client = kube::client::Client::try_default().await.unwrap();
+                let pod = k8s::pod::find_pod(&pod_name, "default", &client)
+                    .await
+                    .unwrap();
+                let slot_suffix_len = slot.split("-").last().unwrap().len() + 1;
+                let instance_name = &slot[..slot.len() - slot_suffix_len];
+                let instance_suffix_len = instance_name.split("-").last().unwrap().len() + 1;
+                let config_name = &instance_name[..instance_name.len() - instance_suffix_len];
+                // find instance to get UID
+                // let instance =
+                //     akri_shared::akri::instance::find_instance(instance_name, "default", &client)
+                //         .await
+                //         .unwrap();
+                // let owner_info = k8s::OwnershipInfo::new(
+                //     k8s::OwnershipType::Instance,
+                //     instance_name.to_string(),
+                //     instance.metadata.uid.unwrap(),
+                // );
+                // k8s::pod::add_owner_to_pod(&pod, owner_info, "default", &client)
+                //     .await
+                //     .unwrap();
+                let mut labels = std::collections::BTreeMap::new();
+                labels.insert("akri.sh/instance".to_string(), instance_name.to_string());
+                labels.insert("akri.sh/configuration".to_string(), config_name.to_string());
+                labels.insert(
+                    "akri.sh/target-node".to_string(),
+                    std::env::var("AGENT_NODE_NAME").unwrap(),
+                );
+                k8s::pod::add_labels_to_pod(&pod, labels, "default", &client)
+                    .await
+                    .unwrap();
+                // k8s::pod::add_label_to_pod(
+                //     &pod,
+                //     "akri.sh/target-node",
+                //     &std::env::var("AGENT_NODE_NAME").unwrap(),
+                //     "default",
+                //     &client,
+                // )
+                // .await
+                // .unwrap();
+
+                self.slot_pod_map.write().unwrap().insert(slot, pod_name);
+            }
+        }
         trace!(
             "reconcile - removal_slot_map after removing node_slot_usage: {:?}",
             self.removal_slot_map
@@ -159,7 +210,7 @@ impl DevicePluginSlotReconciler {
                 .device_usage
                 .iter()
                 .filter_map(|(k, v)| {
-                    if v != node_name && node_slot_usage.contains(k) {
+                    if v != node_name && node_slot_usage.contains_key(k) {
                         // We need to add node_name to this slot IF
                         //     the slot is not labeled with node_name AND
                         //     there is a container using that slot on this node
@@ -181,7 +232,7 @@ impl DevicePluginSlotReconciler {
                 .device_usage
                 .iter()
                 .filter_map(|(k, v)| {
-                    if v == node_name && !node_slot_usage.contains(k) {
+                    if v == node_name && !node_slot_usage.contains_key(k) {
                         // We need to clean this slot IF
                         //     this slot is handled by this node AND
                         //     there are no containers using that slot on this node
@@ -319,6 +370,7 @@ pub async fn periodic_slot_reconciliation(
 
     let reconciler = DevicePluginSlotReconciler {
         removal_slot_map: Arc::new(std::sync::Mutex::new(HashMap::new())),
+        slot_pod_map: Arc::new(std::sync::RwLock::new(HashMap::new())),
     };
     let slot_query = CriCtlSlotQuery {
         crictl_path,
@@ -349,7 +401,11 @@ mod reconcile_tests {
     use k8s_openapi::api::core::v1::Pod;
     use kube::api::ObjectList;
 
-    fn configure_get_node_slots(mock: &mut MockSlotQuery, result: HashSet<String>, error: bool) {
+    fn configure_get_node_slots(
+        mock: &mut MockSlotQuery,
+        result: std::collections::HashMap<String>,
+        error: bool,
+    ) {
         mock.expect_get_node_slots().times(1).returning(move || {
             if !error {
                 Ok(result.clone())
@@ -459,6 +515,7 @@ mod reconcile_tests {
 
         let reconciler = DevicePluginSlotReconciler {
             removal_slot_map: Arc::new(Mutex::new(HashMap::new())),
+            slot_pod_map: Arc::new(std::sync::RwLock::new(HashMap::new())),
         };
         configure_scnenario(
             NodeSlots {
@@ -479,6 +536,7 @@ mod reconcile_tests {
 
         let reconciler = DevicePluginSlotReconciler {
             removal_slot_map: Arc::new(Mutex::new(HashMap::new())),
+            slot_pod_map: Arc::new(std::sync::RwLock::new(HashMap::new())),
         };
         configure_scnenario(
             NodeSlots {
@@ -499,6 +557,7 @@ mod reconcile_tests {
 
         let reconciler = DevicePluginSlotReconciler {
             removal_slot_map: Arc::new(Mutex::new(HashMap::new())),
+            slot_pod_map: Arc::new(std::sync::RwLock::new(HashMap::new())),
         };
 
         let grace_period = Duration::from_millis(100);
@@ -538,6 +597,7 @@ mod reconcile_tests {
 
         let reconciler = DevicePluginSlotReconciler {
             removal_slot_map: Arc::new(Mutex::new(HashMap::new())),
+            slot_pod_map: Arc::new(std::sync::RwLock::new(HashMap::new())),
         };
 
         let grace_period = Duration::from_millis(100);
@@ -598,6 +658,7 @@ mod reconcile_tests {
 
         let reconciler = DevicePluginSlotReconciler {
             removal_slot_map: Arc::new(Mutex::new(HashMap::new())),
+            slot_pod_map: Arc::new(std::sync::RwLock::new(HashMap::new())),
         };
 
         let grace_period = Duration::from_millis(100);
@@ -661,6 +722,7 @@ mod reconcile_tests {
 
         let reconciler = DevicePluginSlotReconciler {
             removal_slot_map: Arc::new(Mutex::new(HashMap::new())),
+            slot_pod_map: Arc::new(std::sync::RwLock::new(HashMap::new())),
         };
 
         let grace_period = Duration::from_millis(100);

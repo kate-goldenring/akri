@@ -19,4 +19,4 @@ spec:
         image: nginx
         resources:
           limits:                        
-            akri.sh/akri-debug-echo: "2"
+            akri.sh/akri-debug-echo: "1"

@@ -7,3 +7,4 @@
 - write tests
 - Inheritance for generic dp impl: https://riptutorial.com/rust/example/22917/inheritance-with-traits
 - cant enforce capacity for both config and instance level resources
+- potential erroring if delete deployment and then configuration

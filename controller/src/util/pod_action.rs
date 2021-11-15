@@ -12,6 +12,7 @@ pub enum PodAction {
     /// The broker Pod must be added
     Add,
     /// The broker Pod must be removed
+    /// TODO make complex enum with pod name
     Remove,
     /// The broker Pod must be removed and added
     RemoveAndAdd,
@@ -35,6 +36,7 @@ pub struct PodActionInfo {
     pub instance_action: InstanceAction,
     pub status_start_time: Option<Time>,
     pub unknown_node: bool,
+    // TODO: change to pod_name
     pub trace_node_name: String,
 }
 

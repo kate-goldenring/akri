@@ -88,10 +88,29 @@ impl DiscoveryHandler for DiscoveryHandlerImpl {
                     }
                     // If the device is now offline, return an empty list of instance info
                     offline = true;
+                    let devices = descriptions
+                        .iter()
+                        .filter_map(|description| {
+                            if availability.contains(description){
+                                None
+                            } else{
+                                let mut properties = HashMap::new();
+                            properties.insert(
+                                super::DEBUG_ECHO_DESCRIPTION_LABEL.to_string(),
+                                description.clone(),
+                            );
+                            Some(Device {
+                                id: description.clone(),
+                                properties,
+                                mounts: Vec::default(),
+                                device_specs: Vec::default(),
+                            })
+                            }
+                            
+                        })
+                        .collect::<Vec<Device>>();
                     if let Err(e) = discovered_devices_sender
-                        .send(Ok(DiscoverResponse {
-                            devices: Vec::new(),
-                        }))
+                        .send(Ok(DiscoverResponse { devices }))
                         .await
                     {
                         error!("discover - for debugEcho failed to send discovery response with error {}", e);

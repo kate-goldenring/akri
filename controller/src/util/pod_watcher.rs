@@ -280,10 +280,10 @@ impl BrokerPodWatcher {
             .ok_or_else(|| anyhow::anyhow!("Pod doesn't have labels"))?;
         let instance_id = labels
             .get(AKRI_INSTANCE_LABEL_NAME)
-            .ok_or_else(|| anyhow::anyhow!("No configuration name found."))?;
+            .ok_or_else(|| anyhow::anyhow!("No instance name found."))?;
         let config_name = labels
             .get(AKRI_CONFIGURATION_LABEL_NAME)
-            .ok_or_else(|| anyhow::anyhow!("No instance id found."))?;
+            .ok_or_else(|| anyhow::anyhow!("No configuration id found."))?;
         Ok((instance_id.to_string(), config_name.to_string()))
     }
 

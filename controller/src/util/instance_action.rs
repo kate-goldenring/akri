@@ -145,6 +145,7 @@ async fn handle_instance(
 /// * what to do with the broker Pod is described by action
 #[derive(Clone, Debug, PartialEq)]
 struct PodContext {
+    pod_name: String,
     node_name: Option<String>,
     namespace: Option<String>,
     action: PodAction,
@@ -207,6 +208,7 @@ fn determine_action_for_pod(
     }
 
     let mut update_pod_context = PodContext {
+        pod_name: k8s_pod.metadata.name.clone().unwrap(),
         node_name: Some(node_to_run_pod_on.to_string()),
         namespace: k8s_pod.metadata.namespace.clone(),
         action: PodAction::NoAction,
@@ -270,12 +272,7 @@ async fn handle_deletion_work(
         instance_shared,
         &"pod".to_string()
     );
-    let pod_app_name = pod::create_pod_app_name(
-        instance_name,
-        context_node_name,
-        instance_shared,
-        &"pod".to_string(),
-    );
+    let pod_app_name = context.pod_name.as_ref();
     trace!(
         "handle_deletion_work - pod::remove_pod name={:?}, namespace={:?}",
         &pod_app_name,
@@ -301,6 +298,7 @@ mod handle_deletion_work_tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let context = PodContext {
+            pod_name: "todo".to_string(),
             node_name: None,
             namespace: Some("namespace".into()),
             action: PodAction::NoAction,
@@ -424,6 +422,7 @@ pub async fn handle_instance_change(
             (
                 node.to_string(),
                 PodContext {
+                    pod_name: String::new(),
                     node_name: None,
                     namespace: None,
                     action: default_action,

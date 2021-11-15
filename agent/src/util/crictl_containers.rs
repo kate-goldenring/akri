@@ -12,21 +12,34 @@ struct CriCtlOutput {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 struct CriCtlContainer {
+    labels: HashMap<String, String>,
     annotations: HashMap<String, String>,
 }
 
 /// This gets the usage slots for an instance by getting the annotations that were stored at id `AKRI_SLOT_ANNOTATION_NAME` during allocate.
-pub fn get_container_slot_usage(crictl_output: &str) -> HashSet<String> {
+pub fn get_container_slot_usage(crictl_output: &str) -> HashMap<String, String> {
+    trace!("get_container_slot_usage - started");
     match serde_json::from_str::<CriCtlOutput>(crictl_output) {
         Ok(crictl_output_parsed) => crictl_output_parsed
             .containers
-            .iter()
+            .into_iter()
             .filter_map(|container| {
-                container
+                if let Some(slot) = container
                     .annotations
                     .get(&AKRI_SLOT_ANNOTATION_NAME.to_string())
+                {
+                    Some((
+                        slot.to_owned(),
+                        container
+                            .labels
+                            .get("io.kubernetes.pod.name")
+                            .unwrap()
+                            .to_owned(),
+                    ))
+                } else {
+                    None
+                }
             })
-            .map(|string_ref| string_ref.to_string())
             .collect(),
         Err(e) => {
             trace!(
@@ -34,7 +47,7 @@ pub fn get_container_slot_usage(crictl_output: &str) -> HashSet<String> {
                 e,
                 &crictl_output
             );
-            HashSet::default()
+            HashMap::default()
         }
     }
 }

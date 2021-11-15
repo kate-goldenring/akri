@@ -112,6 +112,271 @@ pub fn create_pod_app_name(
     }
 }
 
+/// Get Pod for a given name and namespace
+///
+/// Example:
+///
+/// ```no_run
+/// use akri_shared::akri::pod;
+/// use kube::client::Client;
+/// use kube::config;
+///
+/// # #[tokio::main]
+/// # async fn main() {
+/// let api_client = Client::try_default().await.unwrap();
+/// let pod = pod::find_pod(
+///     "pod-name",
+///     "default",
+///     &api_client).await.unwrap();
+/// # }
+/// ```
+pub async fn find_pod(
+    name: &str,
+    namespace: &str,
+    kube_client: &Client,
+) -> Result<Pod, anyhow::Error> {
+    log::trace!("find_instance enter");
+    let pods_client: Api<Pod> = Api::namespaced(kube_client.clone(), namespace);
+
+    log::trace!("find_pod getting instance with name {}", name);
+
+    match pods_client.get(name).await {
+        Ok(pod) => {
+            log::trace!("find_pod return");
+            Ok(pod)
+        }
+        Err(e) => match e {
+            kube::Error::Api(ae) => {
+                log::trace!(
+                    "find_pod kube_client.request returned kube error: {:?}",
+                    ae
+                );
+                Err(anyhow::anyhow!(ae))
+            }
+            _ => {
+                log::trace!("find_pod kube_client.request error: {:?}", e);
+                Err(anyhow::anyhow!(e))
+            }
+        },
+    }
+}
+
+/// Add an owner to a Pod's ownership reference list. TODO fix example below 
+///
+/// Example:
+///
+/// ```no_run
+/// use akri_shared::akri::pod::PodSpec;
+/// use akri_shared::akri::instance;
+/// use kube::client::Client;
+/// use kube::config;
+///
+/// # #[tokio::main]
+/// # async fn main() {
+/// let api_client = Client::try_default().await.unwrap();
+/// pod::add_owner_to_pod(
+///     &InstanceSpec {
+///         configuration_name: "capability_configuration_name".to_string(),
+///         shared: true,
+///         nodes: Vec::new(),
+///         device_usage: std::collections::HashMap::new(),
+///         broker_properties: std::collections::HashMap::new(),
+///     },
+///     "instance-1",
+///     "default",
+///     &api_client).await.unwrap();
+/// # }
+/// ```
+pub async fn add_owner_to_pod(
+    pod: &Pod,
+    ownership: OwnershipInfo,
+    namespace: &str,
+    kube_client: &Client,
+) -> Result<(), anyhow::Error> {
+    log::trace!("add_owner_to_pod enter");
+    let mut updated_pod = pod.clone();
+    let mut owners = 
+        match updated_pod.metadata.owner_references {
+            Some(o) => o.clone(),
+            None => Vec::new(),
+        };
+    owners.iter_mut().for_each(|o| {
+        o.controller = Some(false)
+    });
+    owners.push(OwnerReference {
+        api_version: ownership.get_api_version(),
+        kind: ownership.get_kind(),
+        controller: ownership.get_controller(),
+        block_owner_deletion: ownership.get_block_owner_deletion(),
+        name: ownership.get_name(),
+        uid: ownership.get_uid(),
+    });
+    updated_pod.metadata.owner_references = Some(owners);
+    let pods_client: Api<Pod> = Api::namespaced(kube_client.clone(), namespace);
+    match pods_client
+        .patch(
+            pod.metadata.name.as_ref().unwrap(),
+            &kube::api::PatchParams::default(),
+            &kube::api::Patch::Merge(&updated_pod),
+        )
+        .await
+    {
+        Ok(_pod_modified) => {
+            log::trace!("add_owner_to_pod return");
+            Ok(())
+        }
+        Err(kube::Error::Api(ae)) => {
+            log::trace!(
+                "add_owner_to_pod kube_client.request returned kube error: {:?}",
+                ae
+            );
+            Err(ae.into())
+        }
+        Err(e) => {
+            log::trace!("add_owner_to_pod kube_client.request error: {:?}", e);
+            Err(e.into())
+        }
+    }
+}
+
+/// Add a label to a Pod.. TODO fix example below 
+///
+/// Example:
+///
+/// ```no_run
+/// use akri_shared::akri::pod::PodSpec;
+/// use akri_shared::akri::instance;
+/// use kube::client::Client;
+/// use kube::config;
+///
+/// # #[tokio::main]
+/// # async fn main() {
+/// let api_client = Client::try_default().await.unwrap();
+/// pod::add_owner_to_pod(
+///     &InstanceSpec {
+///         configuration_name: "capability_configuration_name".to_string(),
+///         shared: true,
+///         nodes: Vec::new(),
+///         device_usage: std::collections::HashMap::new(),
+///         broker_properties: std::collections::HashMap::new(),
+///     },
+///     "instance-1",
+///     "default",
+///     &api_client).await.unwrap();
+/// # }
+/// ```
+pub async fn add_labels_to_pod(
+    pod: &Pod,
+    new_labels: std::collections::BTreeMap<String, String>,
+    namespace: &str,
+    kube_client: &Client,
+) -> Result<(), anyhow::Error> {
+    log::trace!("add_label_to_pod enter");
+    let mut updated_pod = pod.clone();
+    let labels = 
+        match updated_pod.metadata.labels {
+            Some(l) => {let mut l = l.clone();
+                l.append(&mut new_labels.to_owned());
+                l},
+            None => new_labels,
+        };
+    updated_pod.metadata.labels = Some(labels);
+    let pods_client: Api<Pod> = Api::namespaced(kube_client.clone(), namespace);
+    match pods_client
+        .patch(
+            pod.metadata.name.as_ref().unwrap(),
+            &kube::api::PatchParams::default(),
+            &kube::api::Patch::Merge(&updated_pod),
+        )
+        .await
+    {
+        Ok(_pod_modified) => {
+            log::trace!("add_owner_to_pod return");
+            Ok(())
+        }
+        Err(kube::Error::Api(ae)) => {
+            log::trace!(
+                "add_owner_to_pod kube_client.request returned kube error: {:?}",
+                ae
+            );
+            Err(ae.into())
+        }
+        Err(e) => {
+            log::trace!("add_owner_to_pod kube_client.request error: {:?}", e);
+            Err(e.into())
+        }
+    }
+}
+
+/// Add a label to a Pod.. TODO fix example below 
+///
+/// Example:
+///
+/// ```no_run
+/// use akri_shared::akri::pod::PodSpec;
+/// use akri_shared::akri::instance;
+/// use kube::client::Client;
+/// use kube::config;
+///
+/// # #[tokio::main]
+/// # async fn main() {
+/// let api_client = Client::try_default().await.unwrap();
+/// pod::add_owner_to_pod(
+///     &InstanceSpec {
+///         configuration_name: "capability_configuration_name".to_string(),
+///         shared: true,
+///         nodes: Vec::new(),
+///         device_usage: std::collections::HashMap::new(),
+///         broker_properties: std::collections::HashMap::new(),
+///     },
+///     "instance-1",
+///     "default",
+///     &api_client).await.unwrap();
+/// # }
+/// ```
+pub async fn add_label_to_pod(
+    pod: &Pod,
+    label_key: &str,
+    label_value: &str,
+    namespace: &str,
+    kube_client: &Client,
+) -> Result<(), anyhow::Error> {
+    log::trace!("add_label_to_pod enter");
+    let mut updated_pod = pod.clone();
+    let mut labels = 
+        match updated_pod.metadata.labels {
+            Some(l) => l.clone(),
+            None => std::collections::BTreeMap::new(),
+        };
+    labels.insert(label_key.to_string(), label_value.to_string());
+    updated_pod.metadata.labels = Some(labels);
+    let pods_client: Api<Pod> = Api::namespaced(kube_client.clone(), namespace);
+    match pods_client
+        .patch(
+            pod.metadata.name.as_ref().unwrap(),
+            &kube::api::PatchParams::default(),
+            &kube::api::Patch::Merge(&updated_pod),
+        )
+        .await
+    {
+        Ok(_pod_modified) => {
+            log::trace!("add_owner_to_pod return");
+            Ok(())
+        }
+        Err(kube::Error::Api(ae)) => {
+            log::trace!(
+                "add_owner_to_pod kube_client.request returned kube error: {:?}",
+                ae
+            );
+            Err(ae.into())
+        }
+        Err(e) => {
+            log::trace!("add_owner_to_pod kube_client.request error: {:?}", e);
+            Err(e.into())
+        }
+    }
+}
+
 type ResourceQuantityType = BTreeMap<String, Quantity>;
 
 /// Create Kubernetes Pod based on Device Capabililty Instance & Config.
