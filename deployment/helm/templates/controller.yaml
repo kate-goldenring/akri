@@ -41,6 +41,14 @@ spec:
           limits:
             memory: {{ .Values.controller.resources.memoryLimit }}
             cpu: {{ .Values.controller.resources.cpuLimit }}
+        securityContext:
+          capabilities:
+            drop:
+            - all 
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 333
+          readOnlyRootFilesystem: true
         {{- if .Values.prometheus.enabled }}
         ports:
           - name: {{ .Values.prometheus.portName | quote }}

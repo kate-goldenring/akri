@@ -50,10 +50,8 @@ spec:
           limits:
             memory: {{ .Values.agent.resources.memoryLimit }}
             cpu: {{ .Values.agent.resources.cpuLimit }}
-        {{- if .Values.agent.securityContext }}
         securityContext:
-        {{- toYaml .Values.agent.securityContext | nindent 10 }}
-        {{- end}}
+          privileged: true
         env:
           {{- if .Values.agent.allowDebugEcho }}
           - name: ENABLE_DEBUG_ECHO
@@ -83,10 +81,6 @@ spec:
             mountPath: /host/usr/bin/crictl
           - name: var-run-dockershim
             mountPath: /host/var/run/dockershim.sock
-          {{- if .Values.agent.host.udev }}
-          - name: devices
-            mountPath: /run/udev
-          {{- end }}
         {{- if .Values.prometheus.enabled }}
         ports:
           - name: {{ .Values.prometheus.portName | quote }}
@@ -109,9 +103,4 @@ spec:
       - name: var-run-dockershim
         hostPath:
           path: "{{ .Values.agent.host.dockerShimSock }}"
-      {{- if .Values.agent.host.udev }}
-      - name: devices
-        hostPath:
-          path: "{{ .Values.agent.host.udev }}"
-      {{- end }}
 {{- end }}

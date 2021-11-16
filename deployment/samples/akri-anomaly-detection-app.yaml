@@ -19,6 +19,14 @@ spec:
         env:
         - name: CONFIGURATION_NAME
           value: akri-opcua-monitoring
+        securityContext:
+          capabilities:
+            drop:
+            - all 
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 333
+          readOnlyRootFilesystem: true
 ---
 apiVersion: v1
 kind: Service

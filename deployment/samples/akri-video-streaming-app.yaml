@@ -32,6 +32,14 @@ spec:
         #   value: "akri-udev-video-<id>-svc"
         - name: CONFIGURATION_NAME
           value: akri-udev-video
+        securityContext:
+          capabilities:
+            drop:
+            - all 
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 333
+          readOnlyRootFilesystem: true
 ---
 apiVersion: v1
 kind: Service

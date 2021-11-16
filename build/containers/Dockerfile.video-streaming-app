@@ -15,5 +15,5 @@ COPY ./samples/apps/video-streaming-app .
 
 # Link the container to the Akri repository
 LABEL org.opencontainers.image.source https://github.com/project-akri/akri
-
+USER 333
 CMD python3 ./streaming.py
