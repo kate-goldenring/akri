@@ -134,6 +134,7 @@ pub mod util {
     use super::{common, probe_types, to_deserialize, to_serialize};
     use akri_discovery_utils::filtering::{FilterList, FilterType};
     use log::{error, info, trace};
+    use std::collections::HashSet;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use tokio::{
         io::ErrorKind,
@@ -202,7 +203,10 @@ pub mod util {
             .collect::<Vec<String>>()
     }
 
-    async fn get_responsive_uris(uris: Vec<String>, onvif_query: &impl OnvifQuery) -> Vec<String> {
+    async fn get_responsive_uris(
+        uris: HashSet<String>,
+        onvif_query: &impl OnvifQuery,
+    ) -> Vec<String> {
         let futures: Vec<_> = uris
             .iter()
             .map(|uri| onvif_query.is_device_responding(uri))
@@ -341,7 +345,7 @@ pub mod util {
             "simple_onvif_discover - uris discovered by udp broadcast {:?}",
             broadcast_responses
         );
-        let mut filtered_uris = Vec::new();
+        let mut filtered_uris = std::collections::HashSet::new();
         broadcast_responses.into_iter().for_each(|r| {
             filtered_uris.extend(get_scope_filtered_uris_from_discovery_response(
                 &r,

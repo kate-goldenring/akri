@@ -16,6 +16,10 @@ useDevelopmentContainers: true
 # This can be set from the helm command line using `--set imagePullSecrets[0].name="mysecret"`
 imagePullSecrets: []
 
+# kubernetesDistro describes the Kubernetes distro Akri is running on. It is used to conditionally set
+# distribution specific values such as container runtime socket. Options: microk8s | k3s | k8s
+kubernetesDistro: ""
+
 # generalize references to `apiGroups` and `apiVersion` values for Akri CRDs
 crds:
   group: akri.sh
@@ -41,7 +45,7 @@ controller:
   enabled: true
   image:
     # repository is the Akri Controller container reference
-    repository: ghcr.io/deislabs/akri/controller
+    repository: ghcr.io/project-akri/akri/controller
     # tag is the Akri Controller container tag
     # controller.yaml will default to v(AppVersion)[-dev]
     # with `-dev` added if `useDevelopmentContainers` is specified
@@ -78,9 +82,9 @@ agent:
   full: false
   image:
     # repository is the Akri Agent container reference
-    repository: ghcr.io/deislabs/akri/agent
+    repository: ghcr.io/project-akri/akri/agent
     # fullRepository is the container reference for the Akri Agent with embedded Discovery Handlers
-    fullRepository: ghcr.io/deislabs/akri/agent-full
+    fullRepository: ghcr.io/project-akri/akri/agent-full
     # tag is the Akri Agent container tag
     # agent.yaml will default to v(AppVersion)[-dev]
     # with `-dev` added if `useDevelopmentContainers` is specified
@@ -94,10 +98,11 @@ agent:
     discoveryHandlers: /var/lib/akri
     # kubeletDevicePlugins is the location of the kubelet device-plugin sockets
     kubeletDevicePlugins: /var/lib/kubelet/device-plugins
-    # crictl is the node path to crictl
-    crictl: /usr/bin/crictl
-    # dockerShimSock is the node path of the docker socket
-    dockerShimSock: /var/run/dockershim.sock
+    # containerRuntimeSocket is the default node path of the container runtime socket. 
+    # For MicroK8s, set to "/var/snap/microk8s/common/run/containerd.sock"
+    # For K3s, set to "/run/k3s/containerd/containerd.sock"
+    # For standard K8s, set to "/var/run/dockershim.sock"
+    containerRuntimeSocket: ""
     # udev is the node path of udev, usually at `/run/udev`
     udev:
   # allowDebugEcho dictates whether the Akri Agent will allow DebugEcho Configurations
@@ -222,7 +227,7 @@ debugEcho:
     brokerProperties: {}
     # capacity is the capacity for any instances created as a result of
     # applying this debugEcho configuration
-    capacity: 1
+    capacity: 2
     discoveryDetails:
       # descriptions is the list of instances created as a result of
       # applying this debugEcho configuration
@@ -286,7 +291,7 @@ debugEcho:
     enabled: false
     image:
       # repository is the container reference
-      repository: ghcr.io/deislabs/akri/debug-echo-discovery
+      repository: ghcr.io/project-akri/akri/debug-echo-discovery
       # tag is the container tag
       # debug-echo-configuration.yaml will default to v(AppVersion)[-dev]
       # with `-dev` added if `useDevelopmentContainers` is specified
@@ -395,7 +400,7 @@ onvif:
     enabled: false
     image:
       # repository is the container reference
-      repository: ghcr.io/deislabs/akri/onvif-discovery
+      repository: ghcr.io/project-akri/akri/onvif-discovery
       # tag is the container tag
       # onvif-configuration.yaml will default to v(AppVersion)[-dev]
       # with `-dev` added if `useDevelopmentContainers` is specified
@@ -502,7 +507,7 @@ opcua:
     enabled: false
     image:
       # repository is the container reference
-      repository: ghcr.io/deislabs/akri/opcua-discovery
+      repository: ghcr.io/project-akri/akri/opcua-discovery
       # tag is the container tag
       # opcua-configuration.yaml will default to v(AppVersion)[-dev]
       # with `-dev` added if `useDevelopmentContainers` is specified
@@ -600,7 +605,7 @@ udev:
     enabled: false
     image:
       # repository is the container reference
-      repository: ghcr.io/deislabs/akri/udev-discovery
+      repository: ghcr.io/project-akri/akri/udev-discovery
       # tag is the container tag
       # udev-configuration.yaml will default to v(AppVersion)[-dev]
       # with `-dev` added if `useDevelopmentContainers` is specified
@@ -651,7 +656,7 @@ webhookConfiguration:
   caBundle: null
   image:
     # repository is the Akri Webhook for Configurations image reference
-    repository: ghcr.io/deislabs/akri/webhook-configuration
+    repository: ghcr.io/project-akri/akri/webhook-configuration
     # tag is the container tag
     # webhook-configuration.yaml will default to v(AppVersion)[-dev]
     # with `-dev` added if `useDevelopmentContainers` is specified

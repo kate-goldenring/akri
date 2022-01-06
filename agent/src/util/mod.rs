@@ -4,6 +4,7 @@ pub mod crictl_containers;
 mod device_plugin_builder;
 mod device_plugin_service;
 pub mod discovery_operator;
+#[cfg(any(test, feature = "agent-full"))]
 pub mod embedded_discovery_handlers;
 // TODO: more specific visibility
 pub mod fs_watch;
