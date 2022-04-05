@@ -1,7 +1,7 @@
 <p align="center"><img src="https://github.com/project-akri/akri-docs/blob/main/art/logo-horizontal/akri-logo-horizontal-light.svg" alt="Akri Logo" width="300"></p>
 
 [![Slack channel #akri](https://img.shields.io/badge/slack-akri-blueviolet.svg?logo=slack)](https://kubernetes.slack.com/messages/akri) 
-[![Rust Version](https://img.shields.io/badge/rustc-1.55.0-blue.svg)](https://blog.rust-lang.org/2021/09/09/Rust-1.55.0.html) 
+[![Rust Version](https://img.shields.io/badge/rustc-1.58.1-blue.svg)](https://blog.rust-lang.org/2022/01/20/Rust-1.58.1.html) 
 [![Kubernetes Version](https://img.shields.io/badge/kubernetes-≥%201.16-blue.svg)](https://kubernetes.io/) 
 [![codecov](https://codecov.io/gh/project-akri/akri/branch/main/graph/badge.svg?token=V468HO7CDE)](https://codecov.io/gh/project-akri/akri) 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5339/badge)](https://bestpractices.coreinfrastructure.org/projects/5339) 
@@ -14,6 +14,8 @@
 
 
 ----
+Akri is a [Cloud Native Computing Foundation (CNCF) Sandbox project](https://www.cncf.io/sandbox-projects/).
+
 Akri lets you easily expose heterogeneous leaf devices (such as IP cameras and USB devices) as resources in a Kubernetes cluster, while also supporting the exposure of embedded hardware resources such as GPUs and FPGAs. Akri continually detects nodes that have access to these devices and schedules workloads based on them. 
 
 Simply put: you name it, Akri finds it, you use it.
@@ -56,4 +58,4 @@ You can reach the Akri community via the [#akri](https://kubernetes.slack.com/me
 Akri welcomes contributions, whether by [creating new issues](https://github.com/project-akri/akri/issues/new/choose) or pull requests. See our [contributing document](https://docs.akri.sh/community/contributing) on how to get started!
 
 ## Licensing
-This project is released under the [MIT License](./LICENSE).
+This project is released under the [Apache 2.0 license](./LICENSE).

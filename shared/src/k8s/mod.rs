@@ -7,10 +7,12 @@ use super::akri::{
     API_NAMESPACE, API_VERSION,
 };
 use async_trait::async_trait;
+use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::{Node, Pod, Service};
 use kube::{api::ObjectList, client::Client};
 use mockall::{automock, predicate::*};
 
+pub mod job;
 pub mod node;
 pub mod pod;
 pub mod service;
@@ -96,6 +98,11 @@ pub trait KubeInterface: Send + Sync {
     async fn find_pods_with_field(&self, selector: &str) -> Result<ObjectList<Pod>, anyhow::Error>;
     async fn create_pod(&self, pod_to_create: &Pod, namespace: &str) -> Result<(), anyhow::Error>;
     async fn remove_pod(&self, pod_to_remove: &str, namespace: &str) -> Result<(), anyhow::Error>;
+
+    async fn find_jobs_with_label(&self, selector: &str) -> Result<ObjectList<Job>, anyhow::Error>;
+    async fn find_jobs_with_field(&self, selector: &str) -> Result<ObjectList<Job>, anyhow::Error>;
+    async fn create_job(&self, job_to_create: &Job, namespace: &str) -> Result<(), anyhow::Error>;
+    async fn remove_job(&self, job_to_remove: &str, namespace: &str) -> Result<(), anyhow::Error>;
 
     async fn find_services(&self, selector: &str) -> Result<ObjectList<Service>, anyhow::Error>;
     async fn create_service(
@@ -248,6 +255,77 @@ impl KubeInterface for KubeImpl {
     /// ```
     async fn remove_pod(&self, pod_to_remove: &str, namespace: &str) -> Result<(), anyhow::Error> {
         pod::remove_pod(pod_to_remove, namespace, self.get_kube_client()).await
+    }
+
+    /// Find Kuberenetes Jobs with specified label selector
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// use akri_shared::k8s;
+    /// use akri_shared::k8s::KubeInterface;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let kube = k8s::KubeImpl::new().await.unwrap();
+    /// let interesting_jobs = kube.find_jobs_with_label("label=interesting").await.unwrap();
+    /// # }
+    /// ```
+    async fn find_jobs_with_label(&self, selector: &str) -> Result<ObjectList<Job>, anyhow::Error> {
+        job::find_jobs_with_selector(Some(selector.to_string()), None, self.get_kube_client()).await
+    }
+    /// Find Kuberenetes Jobs with specified field selector
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// use akri_shared::k8s;
+    /// use akri_shared::k8s::KubeInterface;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let kube = k8s::KubeImpl::new().await.unwrap();
+    /// let jobs_on_node_a = kube.find_jobs_with_field("spec.nodeName=node-a").await.unwrap();
+    /// # }
+    /// ```
+    async fn find_jobs_with_field(&self, selector: &str) -> Result<ObjectList<Job>, anyhow::Error> {
+        job::find_jobs_with_selector(None, Some(selector.to_string()), self.get_kube_client()).await
+    }
+
+    /// Create Kuberenetes job
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// use akri_shared::k8s;
+    /// use akri_shared::k8s::KubeInterface;
+    /// use k8s_openapi::api::batch::v1::Job;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let kube = k8s::KubeImpl::new().await.unwrap();
+    /// kube.create_job(&Job::default(), "job_namespace").await.unwrap();
+    /// # }
+    /// ```
+    async fn create_job(&self, job_to_create: &Job, namespace: &str) -> Result<(), anyhow::Error> {
+        job::create_job(job_to_create, namespace, self.get_kube_client()).await
+    }
+    /// Remove Kubernetes job
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// use akri_shared::k8s;
+    /// use akri_shared::k8s::KubeInterface;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let kube = k8s::KubeImpl::new().await.unwrap();
+    /// kube.remove_job("job_to_remove", "job_namespace").await.unwrap();
+    /// # }
+    /// ```
+    async fn remove_job(&self, job_to_remove: &str, namespace: &str) -> Result<(), anyhow::Error> {
+        job::remove_job(job_to_remove, namespace, self.get_kube_client()).await
     }
 
     /// Get Kuberenetes services with specified label selector
@@ -415,6 +493,7 @@ impl KubeInterface for KubeImpl {
     async fn get_instances(&self) -> Result<InstanceList, anyhow::Error> {
         instance::get_instances(&self.get_kube_client()).await
     }
+
     /// Create Akri Instance
     ///
     /// Example:
@@ -533,30 +612,19 @@ pub async fn try_delete_instance(
                 break;
             }
             Err(e) => {
-                // Check if already was deleted else return error
-                match kube_interface
-                    .find_instance(instance_name, instance_namespace)
-                    .await
-                {
-                    Err(e) => {
-                        if let Some(kube::Error::Api(ae)) = e.downcast_ref::<kube::Error>() {
-                            if ae.code == ERROR_NOT_FOUND {
-                                log::trace!(
-                                    "try_delete_instance - discovered Instance {} already deleted",
-                                    instance_name
-                                );
-                                break;
-                            }
-                            log::error!("try_delete_instance - when looking up Instance {}, got kube API error: {:?}", instance_name, ae);
-                        }
-                    }
-                    Ok(_) => {
-                        log::error!(
-                            "try_delete_instance - tried to delete Instance {} but still exists. {} retries left.",
-                            instance_name, MAX_INSTANCE_UPDATE_TRIES - x - 1
+                if let Some(ae) = e.downcast_ref::<kube::error::ErrorResponse>() {
+                    if ae.code == ERROR_NOT_FOUND {
+                        log::trace!(
+                            "try_delete_instance - discovered Instance {} already deleted",
+                            instance_name
                         );
+                        break;
                     }
                 }
+                log::error!(
+                    "try_delete_instance - tried to delete Instance {} but still exists. {} retries left.",
+                    instance_name, MAX_INSTANCE_UPDATE_TRIES - x - 1
+                );
                 if x == MAX_INSTANCE_UPDATE_TRIES - 1 {
                     return Err(e);
                 }
@@ -572,6 +640,54 @@ pub mod test_ownership {
     use super::*;
 
     #[tokio::test]
+    async fn test_try_delete_instance() {
+        let mut mock_kube_interface = MockKubeInterface::new();
+        mock_kube_interface
+            .expect_delete_instance()
+            .times(1)
+            .returning(move |_, _| {
+                let error_response = kube::error::ErrorResponse {
+                    status: "random".to_string(),
+                    message: "blah".to_string(),
+                    reason: "NotFound".to_string(),
+                    code: 404,
+                };
+                Err(error_response.into())
+            });
+        try_delete_instance(&mock_kube_interface, "instance_name", "instance_namespace")
+            .await
+            .unwrap();
+    }
+
+    // Test that succeeds on second try
+    #[tokio::test]
+    async fn test_try_delete_instance_sequence() {
+        let mut seq = mockall::Sequence::new();
+        let mut mock_kube_interface = MockKubeInterface::new();
+        mock_kube_interface
+            .expect_delete_instance()
+            .times(1)
+            .returning(move |_, _| {
+                let error_response = kube::error::ErrorResponse {
+                    status: "random".to_string(),
+                    message: "blah".to_string(),
+                    reason: "SomeError".to_string(),
+                    code: 401,
+                };
+                Err(error_response.into())
+            })
+            .in_sequence(&mut seq);
+        mock_kube_interface
+            .expect_delete_instance()
+            .times(1)
+            .returning(move |_, _| Ok(()))
+            .in_sequence(&mut seq);
+        try_delete_instance(&mock_kube_interface, "instance_name", "instance_namespace")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn test_ownership_from_config() {
         let name = "asdf";
         let uid = "zxcv";
@@ -585,8 +701,8 @@ pub mod test_ownership {
             ownership.get_api_version()
         );
         assert_eq!("Configuration", &ownership.get_kind());
-        assert_eq!(true, ownership.get_controller().unwrap());
-        assert_eq!(true, ownership.get_block_owner_deletion().unwrap());
+        assert!(ownership.get_controller().unwrap());
+        assert!(ownership.get_block_owner_deletion().unwrap());
         assert_eq!(name, &ownership.get_name());
         assert_eq!(uid, &ownership.get_uid());
     }
@@ -601,8 +717,8 @@ pub mod test_ownership {
             ownership.get_api_version()
         );
         assert_eq!("Instance", &ownership.get_kind());
-        assert_eq!(true, ownership.get_controller().unwrap());
-        assert_eq!(true, ownership.get_block_owner_deletion().unwrap());
+        assert!(ownership.get_controller().unwrap());
+        assert!(ownership.get_block_owner_deletion().unwrap());
         assert_eq!(name, &ownership.get_name());
         assert_eq!(uid, &ownership.get_uid());
     }
@@ -613,8 +729,8 @@ pub mod test_ownership {
         let ownership = OwnershipInfo::new(OwnershipType::Pod, name.to_string(), uid.to_string());
         assert_eq!("core/v1", ownership.get_api_version());
         assert_eq!("Pod", &ownership.get_kind());
-        assert_eq!(true, ownership.get_controller().unwrap());
-        assert_eq!(true, ownership.get_block_owner_deletion().unwrap());
+        assert!(ownership.get_controller().unwrap());
+        assert!(ownership.get_block_owner_deletion().unwrap());
         assert_eq!(name, &ownership.get_name());
         assert_eq!(uid, &ownership.get_uid());
     }
@@ -626,8 +742,8 @@ pub mod test_ownership {
             OwnershipInfo::new(OwnershipType::Service, name.to_string(), uid.to_string());
         assert_eq!("core/v1", ownership.get_api_version());
         assert_eq!("Service", &ownership.get_kind());
-        assert_eq!(true, ownership.get_controller().unwrap());
-        assert_eq!(true, ownership.get_block_owner_deletion().unwrap());
+        assert!(ownership.get_controller().unwrap());
+        assert!(ownership.get_block_owner_deletion().unwrap());
         assert_eq!(name, &ownership.get_name());
         assert_eq!(uid, &ownership.get_uid());
     }

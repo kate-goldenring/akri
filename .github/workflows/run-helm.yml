@@ -34,7 +34,9 @@ jobs:
       - uses: azure/setup-helm@v1
 
       - name: Lint helm chart
-        run: helm lint deployment/helm --values test/helm-lint-values.yaml && echo "lint finished successfully" || echo ::warning::"lint found issues"
+        run: |
+          helm lint deployment/helm --values test/helm-lint-values.yaml && echo "lint finished successfully" || echo ::warning::"lint found issues"
+          helm lint deployment/helm --values test/helm-lint-values-jobs.yaml && echo "lint with Job brokers finished successfully" || echo ::warning::"lint with Job brokers found issues"
 
 
   helm:
@@ -69,6 +71,9 @@ jobs:
 
       - name: Lint helm chart
         run: helm lint deployment/helm --values test/helm-lint-values.yaml && echo "lint finished successfully" || echo ::warning::"lint found issues"
+      
+      - name: Ensure chart builds when setting expected values
+        run: helm template deployment/helm --values test/helm-lint-values.yaml
 
       - name: Cache version.txt
         run: |
