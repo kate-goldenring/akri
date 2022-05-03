@@ -217,6 +217,17 @@ jobs:
           sudo k3s ctr image import webhook-configuration.tar
 
       - if: startsWith(matrix.kube.runtime, 'Kubernetes')
+        name: Configure Docker cgroups driver to be systemd
+        run: |
+          cat > /etc/docker/daemon.json <<EOF
+          {
+            "exec-opts": ["native.cgroupdriver=systemd"]
+          }
+          EOF
+          sudo systemctl daemon-reload
+          sudo systemctl restart docker
+          
+      - if: startsWith(matrix.kube.runtime, 'Kubernetes')
         name: Install Kubernetes
         run: |
           sudo apt-get update -y
