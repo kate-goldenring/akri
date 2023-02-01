@@ -25,6 +25,7 @@ serde_derive = "1.0.104"
 tokio = { version = "1.0", features = ["time", "net", "sync"] }
 tokio-stream = { version =  "0.1", features = ["net"] }
 tonic = { version = "0.5.2", features = ["tls"] }
+[target.'cfg(target_os = "linux")'.dependencies]
 udev = "0.5"
 
 [dev-dependencies]
