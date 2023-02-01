@@ -59,6 +59,36 @@ pub trait DevicePluginBuilderInterface: Send + Sync {
 /// For each Instance, builds a Device Plugin, registers it with the kubelet, and serves it over UDS.
 pub struct DevicePluginBuilder {}
 
+impl DevicePluginBuilder {
+    async fn serve_and_register(
+        &self,
+        instance_name: &str,
+        device_endpoint: &str,
+        socket_path: &str,
+        device_plugin_service: DevicePluginService,
+        server_ender_receiver: mpsc::Receiver<()>,
+        server_ender_sender: mpsc::Sender<()>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+        info!("build_device_plugin - entered for device {}", instance_name);
+        let capability_id: String = format!("{}/{}", AKRI_PREFIX, instance_name);
+        self.serve(
+            device_plugin_service,
+            socket_path.to_string(),
+            server_ender_receiver,
+        )
+        .await?;
+
+        self.register(
+            &capability_id,
+            device_endpoint,
+            instance_name,
+            server_ender_sender,
+            KUBELET_SOCKET,
+        )
+        .await
+    }
+}
+
 #[async_trait]
 impl DevicePluginBuilderInterface for DevicePluginBuilder {
     /// This creates a new DevicePluginService for an instance and registers it with the kubelet
@@ -70,19 +100,20 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
         instance_map: InstanceMap,
         device: Device,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-        info!("build_device_plugin - entered for device {}", instance_name);
-        let capability_id: String = format!("{}/{}", AKRI_PREFIX, instance_name);
         let unique_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
         let device_endpoint: String = format!("{}-{}.sock", instance_name, unique_time.as_secs());
-        let socket_path: String = Path::new(DEVICE_PLUGIN_PATH)
-            .join(device_endpoint.clone())
+        let path = Path::new(DEVICE_PLUGIN_PATH).join(&device_endpoint);
+        let socket_path = path
             .to_str()
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!(format!("Could not parse path {:?} as string", path)))?
             .to_string();
-        let (list_and_watch_message_sender, _) =
-            broadcast::channel(LIST_AND_WATCH_MESSAGE_CHANNEL_CAPACITY);
         let (server_ender_sender, server_ender_receiver) =
             mpsc::channel(DEVICE_PLUGIN_SERVER_ENDER_CHANNEL_CAPACITY);
+        let list_and_watch_message_sender = instance_map
+            .lock()
+            .unwrap()
+            .get(instance_name)
+            .ok_or_else(|| anyhow::anyhow!("Instance {instance_name} not found in map"))?;
         let device_plugin_service = DevicePluginService {
             instance_name: instance_name.clone(),
             endpoint: device_endpoint.clone(),
@@ -98,21 +129,23 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
             device,
         };
 
-        self.serve(
-            device_plugin_service,
-            socket_path.clone(),
-            server_ender_receiver,
-        )
-        .await?;
-
-        self.register(
-            &capability_id,
-            &device_endpoint,
-            &instance_name,
-            server_ender_sender,
-            KUBELET_SOCKET,
-        )
-        .await?;
+        // If serving and registering the device plugin fails
+        // clean up created resources if exist.
+        if let Err(e) = self
+            .serve_and_register(
+                &instance_name,
+                &device_endpoint,
+                &socket_path,
+                device_plugin_service,
+                server_ender_receiver,
+                server_ender_sender,
+            )
+            .await
+        {
+            server_ender_sender.send(()).await.ok();
+            tokio::fs::remove_file(socket_path).await.unwrap_or(());
+            return Error(e);
+        }
 
         Ok(())
     }
@@ -156,7 +189,7 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
                 socket_to_delete
             );
             // Socket may already be deleted in the case of the kubelet restart
-            std::fs::remove_file(socket_to_delete).unwrap_or(());
+            tokio::fs::remove_file(socket_to_delete).await.unwrap_or(());
         });
 
         akri_shared::uds::unix_stream::try_connect(&socket_path).await?;
@@ -205,19 +238,7 @@ impl DevicePluginBuilderInterface for DevicePluginBuilder {
             kubelet_socket
         );
 
-        // If fail to register with the kubelet, terminate device plugin
-        if registration_client
-            .register(register_request)
-            .await
-            .is_err()
-        {
-            trace!(
-                "register - failed to register Instance {} with the kubelet ... terminating device plugin",
-                instance_name
-            );
-            server_ender_sender.send(()).await?;
-        }
-        Ok(())
+        registration_client.register(register_request).await?
     }
 }
 

@@ -48,6 +48,8 @@ pub enum InstanceConnectivityStatus {
     Online,
     /// Could not be discovered. Instant contains time at which it was no longer discovered.
     Offline(Instant),
+    /// The Instance Device Plugin Service is starting
+    Pending,
 }
 
 /// Contains an Instance's state
@@ -591,7 +593,8 @@ async fn try_create_instance(
         random_delay().await;
     }
 
-    // Successfully created or updated instance. Add it to instance_map.
+    // Successfully created or updated instance. Update the instance map
+    // to change the connectivity status from Pending to Online.
     dps.instance_map.write().await.insert(
         dps.instance_name.clone(),
         InstanceInfo {

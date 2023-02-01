@@ -15,7 +15,7 @@ use akri_discovery_utils::discovery::v0::{
     discovery_handler_client::DiscoveryHandlerClient, Device, DiscoverRequest, DiscoverResponse,
 };
 use akri_shared::{
-    akri::configuration::Configuration,
+    akri::{configuration::Configuration, instance},
     k8s,
     os::env_var::{ActualEnvVarQuery, EnvVarQuery},
 };
@@ -31,6 +31,7 @@ use mockall::{automock, predicate::*};
 #[cfg(not(test))]
 use std::time::Instant;
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use tokio::sync::broadcast;
 use tonic::transport::{Endpoint, Uri};
 
 /// StreamType provides a wrapper around the two different types of streams returned from embedded
@@ -317,6 +318,11 @@ impl DiscoveryOperator {
         // If there are newly visible instances associated with a Config, make a device plugin and Instance CR for them
         if !new_discovery_results.is_empty() {
             for discovery_result in new_discovery_results {
+                // If the instance is already in the map (possible due to Pending)
+                // then do not attempt to recreate the device plugin
+                if instance_map.contains_key(instance_name) {
+                    continue;
+                }
                 let id = generate_instance_digest(&discovery_result.id, shared);
                 let instance_name = get_device_instance_name(&id, &config_name);
                 trace!(
@@ -324,6 +330,16 @@ impl DiscoveryOperator {
                     instance_name
                 );
                 let instance_map = self.instance_map.clone();
+                let (list_and_watch_message_sender, _) =
+                    broadcast::channel(LIST_AND_WATCH_MESSAGE_CHANNEL_CAPACITY);
+                let instance_info = InstanceInfo {
+                    list_and_watch_message_sender,
+                    connectivity_status: InstanceConnectivityStatus::Pending,
+                };
+                instance_map
+                    .lock()
+                    .unwrap()
+                    .insert(instance_name, instance_info);
                 if let Err(e) = device_plugin_builder
                     .build_device_plugin(
                         instance_name,
@@ -334,7 +350,8 @@ impl DiscoveryOperator {
                     )
                     .await
                 {
-                    error!("handle_discovery_results - error {} building device plugin ... trying again on next iteration", e);
+                    instance_map.lock().unwrap().remove(&instance_name);
+                    error!("handle_discovery_results - error {} building device plugin ... will try again next time device is discovered", e);
                 }
             }
         }
@@ -428,6 +445,7 @@ impl DiscoveryOperator {
                             remove_instance = true;
                         }
                     }
+                    InstanceConnectivityStatus::Pending => (),
                 }
                 if remove_instance {
                     trace!("update_instance_connectivity_status - instance {} has been offline too long ... terminating device plugin", instance);
