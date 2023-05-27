@@ -238,6 +238,7 @@ pub fn inner_register_embedded_discovery_handlers(
         akri_onvif::SHARED,
     ));
     #[cfg(feature = "udev-feat")]
+    #[cfg(target_os = "linux")]
     embedded_discovery_handlers.push((
         akri_udev::DISCOVERY_HANDLER_NAME.to_string(),
         akri_udev::SHARED,
@@ -311,6 +312,7 @@ mod tests {
         #[cfg(feature = "opcua-feat")]
         assert!(discovery_handler_map.lock().unwrap().get("opcua").is_some());
         #[cfg(feature = "udev-feat")]
+        #[cfg(target_os = "linux")]
         assert!(discovery_handler_map.lock().unwrap().get("udev").is_some());
     }
 

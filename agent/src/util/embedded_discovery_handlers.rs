@@ -11,6 +11,7 @@ use akri_shared::{
     os::env_var::{ActualEnvVarQuery, EnvVarQuery},
 };
 #[cfg(any(test, feature = "udev-feat"))]
+#[cfg(target_os = "linux")]
 use akri_udev::discovery_handler::UdevDiscoveryDetails;
 use anyhow::Error;
 use log::trace;
@@ -42,6 +43,7 @@ fn inner_get_discovery_handler(
             ))
         }
         #[cfg(any(test, feature = "udev-feat"))]
+        #[cfg(target_os = "linux")]
         akri_udev::DISCOVERY_HANDLER_NAME => {
             let _discovery_handler_config: UdevDiscoveryDetails = serde_yaml::from_str(&discovery_handler_info.discovery_details).map_err(|e| anyhow::format_err!("udev Configuration discovery details improperly configured with error {:?}", e))?;
             Ok(Box::new(
@@ -88,13 +90,16 @@ mod tests {
         .unwrap();
         assert!(inner_get_discovery_handler(&deserialized, &mock_query).is_ok());
 
-        let udev_yaml = r#"
-        name: udev
-        discoveryDetails: |+
-            udevRules: []
-        "#;
-        let deserialized: DiscoveryHandlerInfo = serde_yaml::from_str(udev_yaml).unwrap();
-        assert!(inner_get_discovery_handler(&deserialized, &mock_query).is_ok());
+        #[cfg(target_os = "linux")]
+        {
+            let udev_yaml = r#"
+            name: udev
+            discoveryDetails: |+
+                udevRules: []
+            "#;
+            let deserialized: DiscoveryHandlerInfo = serde_yaml::from_str(udev_yaml).unwrap();
+            assert!(inner_get_discovery_handler(&deserialized, &mock_query).is_ok());
+        }
 
         let yaml = r#"
         name: opcua

@@ -12,7 +12,7 @@ akri-debug-echo = { path = "../discovery-handlers/debug-echo" }
 akri-discovery-utils = { path = "../discovery-utils" }
 akri-onvif = { path = "../discovery-handlers/onvif", optional = true }
 akri-opcua = { path = "../discovery-handlers/opcua", optional = true }
-akri-udev = { path = "../discovery-handlers/udev", optional = true }
+# akri-udev = { path = "../discovery-handlers/udev", optional = true }
 akri-shared = { path = "../shared" }
 anyhow = "1.0.38"
 async-stream = "0.3"
@@ -47,6 +47,9 @@ tower = "0.4.8"
 url = "2.1.0"
 uuid = { version = "0.8.1", features = ["v4"] }
 
+[target.'cfg(linux)'.dependencies]
+akri-udev = { path = "../discovery-handlers/udev", optional = true }
+
 [build-dependencies]
 tonic-build = "0.5.2"
 
@@ -55,10 +58,12 @@ tonic-build = "0.5.2"
 akri-discovery-utils = { path = "../discovery-utils", features = ["mock-discovery-handler"] }
 akri-onvif = { path = "../discovery-handlers/onvif" }
 akri-opcua = { path = "../discovery-handlers/opcua" }
-akri-udev = { path = "../discovery-handlers/udev"}
 mockall = "0.10.2"
 mock_instant = { version = "0.2", features = ["sync"] }
 tempfile = "3.1.0"
+
+[target.'cfg(linux)'.dev-dependencies]
+akri-udev = { path = "../discovery-handlers/udev" }
 
 [features]
 # To embed discovery handlers, add the desired discovery handler features to default and "agent-full".

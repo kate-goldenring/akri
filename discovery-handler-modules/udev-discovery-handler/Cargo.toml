@@ -9,7 +9,7 @@ rust-version = "1.68.1"
 
 [dependencies]
 akri-discovery-utils = { path = "../../discovery-utils" }
-akri-udev = { path = "../../discovery-handlers/udev" }
+akri-udev = { path = "../../discovery-handlers/udev", optional = true }
 env_logger = "0.10.0"
 log = "0.4"
 tokio = { version = "1.0.1" }
