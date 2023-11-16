@@ -5,7 +5,7 @@ set -ex
 
 echo "User: $(whoami)"
 
-apt_dependencies="git curl libssl-dev pkg-config libudev-dev libv4l-dev"
+apt_dependencies="git curl libssl-dev pkg-config"
 echo "Install dependencies: $apt_dependencies"
 if [ -x "$(command -v sudo)" ];
 then
@@ -34,5 +34,6 @@ fi
 
 echo "Install rustfmt"
 rustup component add rustfmt
-
+echo "Dependencies successfully installed!"
+echo -e "\033[33mNote: to build full agent with embedded udev discovery, also install libudev-dev and libv4l-dev\033[0m"
 exit 0

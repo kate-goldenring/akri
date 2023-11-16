@@ -8,7 +8,6 @@ on:
       - "Build OPC UA Monitoring Broker"
       - "Build OpenCV Base"
       - "Build Production Rust Containers"
-      - "Build UDEV Broker"
       - "Check Rust"
       - "Check versioning"
       - "Helm"

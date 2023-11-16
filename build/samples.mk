@@ -1,7 +1,7 @@
 USE_OPENCV_BASE_VERSION = 0.0.11
 
 .PHONY: samples
-samples: opcua-monitoring-broker onvif-video-broker anomaly-detection-app video-streaming-app akri-udev-video-broker
+samples: opcua-monitoring-broker onvif-video-broker anomaly-detection-app video-streaming-app
 
 %-app:
 	docker buildx build $(COMMON_DOCKER_BUILD_ARGS) --build-arg APPLICATION=$@ --tag "$(PREFIX)/$@:$(LABEL_PREFIX)" --file $(DOCKERFILE_DIR)/Dockerfile.python-app .

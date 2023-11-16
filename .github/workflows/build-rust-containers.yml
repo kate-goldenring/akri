@@ -35,7 +35,7 @@ jobs:
           - label: agent
             cargo-build-args: --release
           - label: agent-full
-            cargo-build-args: --release -F agent-full,onvif-feat,opcua-feat,udev-feat
+            cargo-build-args: --release -F agent-full,onvif-feat,opcua-feat
     
     steps:
     - name: Checkout the head commit of the branch
@@ -110,10 +110,8 @@ jobs:
           - label: controller
           - label: webhook-configuration
           - label: debug-echo-discovery-handler
-          - label: udev-discovery-handler
           - label: opcua-discovery-handler
           - label: onvif-discovery-handler
-          - label: udev-video-broker
     
     steps:
     - name: Checkout the head commit of the branch

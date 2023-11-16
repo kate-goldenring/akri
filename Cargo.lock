@@ -301,10 +301,10 @@ name = "agent"
 version = "0.12.16"
 dependencies = [
  "akri-debug-echo",
- "akri-discovery-utils",
+ "akri-discovery-utils 0.12.16",
  "akri-onvif",
  "akri-opcua",
- "akri-shared",
+ "akri-shared 0.12.16",
  "akri-udev",
  "anyhow",
  "async-stream",
@@ -360,8 +360,8 @@ dependencies = [
 name = "akri-debug-echo"
 version = "0.12.16"
 dependencies = [
- "akri-discovery-utils",
- "akri-shared",
+ "akri-discovery-utils 0.12.16",
+ "akri-shared 0.12.16",
  "anyhow",
  "async-trait",
  "log",
@@ -376,9 +376,30 @@ dependencies = [
 
 [[package]]
 name = "akri-discovery-utils"
+version = "0.12.9"
+source = "git+https://github.com/project-akri/akri/?tag=v0.12.9#911cdc1e9f5aeed76f7e09339db35de4d871478a"
+dependencies = [
+ "akri-shared 0.12.9",
+ "anyhow",
+ "async-stream",
+ "futures",
+ "log",
+ "prost",
+ "serde",
+ "serde_derive",
+ "serde_yaml",
+ "tokio 1.26.0",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tower",
+]
+
+[[package]]
+name = "akri-discovery-utils"
 version = "0.12.16"
 dependencies = [
- "akri-shared",
+ "akri-shared 0.12.16",
  "anyhow",
  "async-stream",
  "async-trait",
@@ -400,7 +421,7 @@ dependencies = [
 name = "akri-onvif"
 version = "0.12.16"
 dependencies = [
- "akri-discovery-utils",
+ "akri-discovery-utils 0.12.16",
  "anyhow",
  "async-trait",
  "base64 0.13.1",
@@ -429,7 +450,7 @@ dependencies = [
 name = "akri-opcua"
 version = "0.12.16"
 dependencies = [
- "akri-discovery-utils",
+ "akri-discovery-utils 0.12.16",
  "anyhow",
  "async-trait",
  "log",
@@ -442,6 +463,31 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "url 2.3.1",
+]
+
+[[package]]
+name = "akri-shared"
+version = "0.12.9"
+source = "git+https://github.com/project-akri/akri/?tag=v0.12.9#911cdc1e9f5aeed76f7e09339db35de4d871478a"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "either",
+ "k8s-openapi",
+ "kube",
+ "log",
+ "mockall",
+ "prometheus",
+ "rand 0.8.5",
+ "schemars",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_yaml",
+ "tokio 1.26.0",
+ "tonic",
+ "tower",
+ "warp",
 ]
 
 [[package]]
@@ -473,18 +519,15 @@ dependencies = [
 name = "akri-udev"
 version = "0.12.16"
 dependencies = [
- "akri-discovery-utils",
+ "akri-discovery-utils 0.12.9",
  "anyhow",
  "async-trait",
- "env_logger",
  "log",
- "mockall",
  "pest",
  "pest_derive",
  "regex",
  "serde",
  "serde_derive",
- "serde_json",
  "tokio 1.26.0",
  "tokio-stream",
  "tonic",
@@ -988,7 +1031,7 @@ checksum = "fbdcdcb6d86f71c5e97409ad45898af11cbc995b4ee8112d59095a28d376c935"
 name = "controller"
 version = "0.12.16"
 dependencies = [
- "akri-shared",
+ "akri-shared 0.12.16",
  "anyhow",
  "async-std",
  "chrono",
@@ -1181,7 +1224,7 @@ name = "debug-echo-discovery-handler"
 version = "0.12.16"
 dependencies = [
  "akri-debug-echo",
- "akri-discovery-utils",
+ "akri-discovery-utils 0.12.16",
  "env_logger",
  "log",
  "tokio 1.26.0",
@@ -2481,7 +2524,7 @@ checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 name = "onvif-discovery-handler"
 version = "0.12.16"
 dependencies = [
- "akri-discovery-utils",
+ "akri-discovery-utils 0.12.16",
  "akri-onvif",
  "env_logger",
  "log",
@@ -2531,7 +2574,7 @@ dependencies = [
 name = "opcua-discovery-handler"
 version = "0.12.16"
 dependencies = [
- "akri-discovery-utils",
+ "akri-discovery-utils 0.12.16",
  "akri-opcua",
  "env_logger",
  "log",
@@ -3146,15 +3189,6 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "rscam"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89056084211cd54924fedf2e2199b906409d1f795cfd8e7e3271061742457018"
-dependencies = [
- "libc",
 ]
 
 [[package]]
@@ -4133,34 +4167,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "udev-discovery-handler"
-version = "0.12.16"
-dependencies = [
- "akri-discovery-utils",
- "akri-udev",
- "env_logger",
- "log",
- "tokio 1.26.0",
-]
-
-[[package]]
-name = "udev-video-broker"
-version = "0.12.16"
-dependencies = [
- "akri-shared",
- "env_logger",
- "lazy_static",
- "log",
- "prometheus",
- "prost",
- "regex",
- "rscam",
- "tokio 1.26.0",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
 name = "unicase"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4426,7 +4432,7 @@ version = "0.12.16"
 dependencies = [
  "actix-rt 2.7.0",
  "actix-web",
- "akri-shared",
+ "akri-shared 0.12.16",
  "clap",
  "k8s-openapi",
  "kube",
