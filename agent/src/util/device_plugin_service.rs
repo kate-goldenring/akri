@@ -478,19 +478,7 @@ impl InstanceDevicePlugin {
                     node_usage.to_string(),
                 );
 
-                // Add suffix _<instance_id> to each device property
-                let converted_properties = self
-                    .device
-                    .properties
-                    .iter()
-                    .map(|(key, value)| {
-                        (
-                            format!("{}_{}", key, &device_property_suffix),
-                            value.to_string(),
-                        )
-                    })
-                    .collect::<HashMap<String, String>>();
-                akri_device_properties.extend(converted_properties);
+                akri_device_properties.extend(self.device.properties.clone());
                 akri_devices.insert(dps.instance_name.clone(), self.device.clone());
 
                 trace!(
@@ -763,18 +751,7 @@ impl ConfigurationDevicePlugin {
                 );
 
                 // Add suffix _<instance_id> to each device property
-                let device_property_suffix = instance_id.to_uppercase();
-                let converted_properties = device
-                    .properties
-                    .iter()
-                    .map(|(key, value)| {
-                        (
-                            format!("{}_{}", key, &device_property_suffix),
-                            value.to_string(),
-                        )
-                    })
-                    .collect::<HashMap<String, String>>();
-                akri_device_properties.extend(converted_properties);
+                akri_device_properties.extend(device.properties.clone());
                 akri_devices.insert(instance_name.clone(), device.clone());
 
                 allocated_instances.insert(
