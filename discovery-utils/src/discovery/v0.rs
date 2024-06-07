@@ -54,8 +54,8 @@ pub struct Empty {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ByteData {
-    #[prost(bytes = "vec", optional, tag = "1")]
-    pub vec: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    #[prost(bytes = "vec", tag = "1")]
+    pub vec: ::prost::alloc::vec::Vec<u8>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

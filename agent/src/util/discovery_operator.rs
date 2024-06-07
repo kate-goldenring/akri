@@ -561,7 +561,7 @@ impl DiscoveryOperator {
         let value;
         if let Some(v) = &property.value {
             value = ByteData {
-                vec: Some(v.as_bytes().to_vec()),
+                vec: v.as_bytes().to_vec(),
             };
         } else if let Some(value_from) = &property.value_from {
             let kube_client = ActualKubeClient::new(kube_interface.clone());
@@ -580,7 +580,7 @@ impl DiscoveryOperator {
             };
         } else {
             // property without value
-            value = ByteData { vec: None }
+            value = ByteData { vec: vec![] }
         }
 
         Ok(Some((property.name.clone(), value)))
@@ -735,9 +735,7 @@ async fn get_discovery_property_value_from_secret(
     // we don't need to check string_data.
     if let Some(data) = secret.data {
         if let Some(v) = data.get(secret_key) {
-            return Ok(Some(ByteData {
-                vec: Some(v.0.clone()),
-            }));
+            return Ok(Some(ByteData { vec: v.0.clone() }));
         }
     }
 
@@ -780,15 +778,13 @@ async fn get_discovery_property_value_from_config_map(
     if let Some(data) = config_map.data {
         if let Some(v) = data.get(config_map_key) {
             return Ok(Some(ByteData {
-                vec: Some(v.as_bytes().to_vec()),
+                vec: v.as_bytes().to_vec(),
             }));
         }
     }
     if let Some(binary_data) = config_map.binary_data {
         if let Some(v) = binary_data.get(config_map_key) {
-            return Ok(Some(ByteData {
-                vec: Some(v.0.clone()),
-            }));
+            return Ok(Some(ByteData { vec: v.0.clone() }));
         }
     }
 
